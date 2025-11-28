@@ -1,0 +1,20 @@
+{
+  "name": "@kookyleo/specspec",
+  "version": "0.1.0",
+  "description": "通用的 Spec DSL 引擎与核心断言库（code-as-spec）。",
+  "type": "module",
+  "main": "src/index.mjs",
+  "exports": {
+    ".": "./src/index.mjs"
+  },
+  "keywords": [
+    "spec",
+    "dsl",
+    "validation",
+    "engine",
+    "code-as-spec"
+  ],
+  "author": "kookyleo",
+  "license": "MIT"
+}
+
