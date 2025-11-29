@@ -4,17 +4,15 @@
 import { describe, it, expect } from 'vitest';
 import {
   DirectoryDescriptor,
-  FileTypeDescriptor,
   FileDescriptor,
   FieldDescriptor,
   PackageDescriptor,
-} from '../src/descriptors/index.mjs';
+} from '../dist/descriptors/index.js';
 import {
-  DirectoryMatcher,
-  FileTypeMatcher,
+  DirectoryValidator,
+  FileValidator,
   FieldValidator,
-  PackageValidator,
-} from '../src/validators/index.mjs';
+} from '../dist/validators/index.js';
 
 describe('DirectoryDescriptor', () => {
   it('should be pure data with opts', () => {
@@ -23,15 +21,15 @@ describe('DirectoryDescriptor', () => {
   });
 });
 
-describe('DirectoryMatcher', () => {
-  const matcher = new DirectoryMatcher();
+describe('DirectoryValidator', () => {
+  const validator = new DirectoryValidator();
 
   it('should match directory', () => {
     const descriptor = new DirectoryDescriptor();
     const mockContext = {
       stat: { isDirectory: () => true }
     };
-    expect(matcher.matches(descriptor, {}, mockContext)).toBe(true);
+    expect(validator.matches(descriptor, {}, mockContext)).toBe(true);
   });
 
   it('should not match file', () => {
@@ -39,60 +37,65 @@ describe('DirectoryMatcher', () => {
     const mockContext = {
       stat: { isDirectory: () => false }
     };
-    expect(matcher.matches(descriptor, {}, mockContext)).toBe(false);
+    expect(validator.matches(descriptor, {}, mockContext)).toBe(false);
   });
 
   it('should return falsy when stat is null', () => {
     const descriptor = new DirectoryDescriptor();
     const mockContext = { stat: null };
-    expect(matcher.matches(descriptor, {}, mockContext)).toBeFalsy();
+    expect(validator.matches(descriptor, {}, mockContext)).toBeFalsy();
   });
 });
 
-describe('FileTypeDescriptor', () => {
+describe('FileDescriptor', () => {
   it('should be pure data with opts', () => {
-    const descriptor = new FileTypeDescriptor({ withExtension: 'json' });
+    const descriptor = new FileDescriptor({ path: 'test.json' });
+    expect(descriptor.opts).toEqual({ path: 'test.json' });
+  });
+
+  it('should support withExtension option', () => {
+    const descriptor = new FileDescriptor({ withExtension: 'json' });
     expect(descriptor.opts).toEqual({ withExtension: 'json' });
   });
 });
 
-describe('FileTypeMatcher', () => {
-  const matcher = new FileTypeMatcher();
+describe('FileValidator', () => {
+  const validator = new FileValidator();
 
   it('should match file with correct extension', () => {
-    const descriptor = new FileTypeDescriptor({ withExtension: 'json' });
+    const descriptor = new FileDescriptor({ withExtension: 'json' });
     const mockContext = {
       path: '/some/path/file.json',
       stat: { isFile: () => true }
     };
-    expect(matcher.matches(descriptor, {}, mockContext)).toBe(true);
+    expect(validator.matches(descriptor, {}, mockContext)).toBe(true);
   });
 
   it('should handle extension with leading dot', () => {
-    const descriptor = new FileTypeDescriptor({ withExtension: '.json' });
+    const descriptor = new FileDescriptor({ withExtension: '.json' });
     const mockContext = {
       path: '/some/path/file.json',
       stat: { isFile: () => true }
     };
-    expect(matcher.matches(descriptor, {}, mockContext)).toBe(true);
+    expect(validator.matches(descriptor, {}, mockContext)).toBe(true);
   });
 
   it('should not match wrong extension', () => {
-    const descriptor = new FileTypeDescriptor({ withExtension: 'json' });
+    const descriptor = new FileDescriptor({ withExtension: 'json' });
     const mockContext = {
       path: '/some/path/file.txt',
       stat: { isFile: () => true }
     };
-    expect(matcher.matches(descriptor, {}, mockContext)).toBe(false);
+    expect(validator.matches(descriptor, {}, mockContext)).toBe(false);
   });
 
   it('should not match directory', () => {
-    const descriptor = new FileTypeDescriptor({ withExtension: 'json' });
+    const descriptor = new FileDescriptor({ withExtension: 'json' });
     const mockContext = {
       path: '/some/path',
       stat: { isFile: () => false }
     };
-    expect(matcher.matches(descriptor, {}, mockContext)).toBe(false);
+    expect(validator.matches(descriptor, {}, mockContext)).toBe(false);
   });
 });
 

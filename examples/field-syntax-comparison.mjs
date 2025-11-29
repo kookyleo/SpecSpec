@@ -2,7 +2,7 @@
 // examples/field-syntax-comparison.mjs
 // Demonstrates RequiredField/OptionalField syntax sugar
 
-import { createCoreDsl } from '../src/index.mjs';
+import { createCoreDsl } from '../dist/index.js';
 
 const { $, Spec, Field } = createCoreDsl();
 

@@ -2,7 +2,9 @@
 // Tests for DSL factory functions
 
 import { describe, it, expect } from 'vitest';
-import { createCoreDsl, Assertions, Descriptors, Spec } from '../src/index.mjs';
+import { createCoreDsl, Spec } from '../dist/index.js';
+import * as Rules from '../dist/rules/index.js';
+import * as Descriptors from '../dist/descriptors/index.js';
 
 describe('createCoreDsl', () => {
   const dsl = createCoreDsl();
@@ -16,107 +18,116 @@ describe('createCoreDsl', () => {
       expect(typeof dsl.Spec).toBe('function');
     });
 
-    it('should export Not factory', () => {
-      expect(typeof dsl.Not).toBe('function');
-    });
-
-    it('should export $ with Is, Contains, Has', () => {
+    it('should export $ with Is, Contains, Has, DoesNot', () => {
       expect(dsl.$).toBeDefined();
       expect(dsl.$.Is).toBeDefined();
       expect(dsl.$.Contains).toBeDefined();
       expect(dsl.$.Has).toBeDefined();
+      expect(dsl.$.DoesNot).toBeDefined();
     });
 
     it('should export descriptor factories', () => {
       expect(typeof dsl.Directory).toBe('function');
-      expect(typeof dsl.FileType).toBe('function');
       expect(typeof dsl.File).toBe('function');
       expect(typeof dsl.Field).toBe('function');
     });
   });
 
   describe('$.Is', () => {
-    it('should create IsJSONAssertion', () => {
-      const assertion = dsl.$.Is.JSON();
-      expect(assertion).toBeInstanceOf(Assertions.IsJSONAssertion);
+    it('should create IsJSONRule', () => {
+      const rule = dsl.$.Is.JSON();
+      expect(rule).toBeInstanceOf(Rules.IsJSONRule);
     });
 
-    it('should create IsStringAssertion', () => {
-      const assertion = dsl.$.Is.String();
-      expect(assertion).toBeInstanceOf(Assertions.IsStringAssertion);
+    it('should create IsStringRule', () => {
+      const rule = dsl.$.Is.String();
+      expect(rule).toBeInstanceOf(Rules.IsStringRule);
     });
 
-    it('should create IsEmptyAssertion', () => {
-      const assertion = dsl.$.Is.Empty();
-      expect(assertion).toBeInstanceOf(Assertions.IsEmptyAssertion);
+    it('should create IsEmptyRule', () => {
+      const rule = dsl.$.Is.Empty();
+      expect(rule).toBeInstanceOf(Rules.IsEmptyRule);
     });
 
-    it('should create IsOneOfAssertion', () => {
-      const assertion = dsl.$.Is.OneOf([dsl.Directory()]);
-      expect(assertion).toBeInstanceOf(Assertions.IsOneOfAssertion);
+    it('should create IsOneOfRule', () => {
+      const rule = dsl.$.Is.OneOf([dsl.Directory()]);
+      expect(rule).toBeInstanceOf(Rules.IsOneOfRule);
     });
 
-    it('should support chained negation $.Is.Not.Empty()', () => {
-      const assertion = dsl.$.Is.Not.Empty();
-      expect(assertion).toBeInstanceOf(Assertions.NotAssertion);
+  });
+
+  describe('$.IsNot', () => {
+    it('should support $.IsNot.Empty()', () => {
+      const rule = dsl.$.IsNot.Empty();
+      expect(rule).toBeInstanceOf(Rules.IsNot);
+    });
+
+    it('should support $.IsNot.JSON()', () => {
+      const rule = dsl.$.IsNot.JSON();
+      expect(rule).toBeInstanceOf(Rules.IsNot);
+    });
+
+    it('should support $.IsNot.String()', () => {
+      const rule = dsl.$.IsNot.String();
+      expect(rule).toBeInstanceOf(Rules.IsNot);
     });
   });
 
   describe('$.Contains', () => {
-    it('should create ContainsAssertion with descriptor', () => {
-      const assertion = dsl.$.Contains(dsl.File({ path: 'test.json' }));
-      expect(assertion).toBeInstanceOf(Assertions.ContainsAssertion);
+    it('should create ContainsRule with descriptor', () => {
+      const rule = dsl.$.Contains(dsl.File({ path: 'test.json' }));
+      expect(rule).toBeInstanceOf(Rules.ContainsRule);
     });
 
     it('should support shorthand $.Contains.File()', () => {
-      const assertion = dsl.$.Contains.File({ path: 'test.json' });
-      expect(assertion).toBeInstanceOf(Assertions.ContainsAssertion);
-      expect(assertion.descriptor).toBeInstanceOf(Descriptors.FileDescriptor);
+      const rule = dsl.$.Contains.File({ path: 'test.json' });
+      expect(rule).toBeInstanceOf(Rules.ContainsRule);
+      expect(rule.descriptor).toBeInstanceOf(Descriptors.FileDescriptor);
     });
 
     it('should support shorthand $.Contains.Field()', () => {
-      const assertion = dsl.$.Contains.Field({ key: 'name' });
-      expect(assertion).toBeInstanceOf(Assertions.ContainsAssertion);
-      expect(assertion.descriptor).toBeInstanceOf(Descriptors.FieldDescriptor);
+      const rule = dsl.$.Contains.Field({ key: 'name' });
+      expect(rule).toBeInstanceOf(Rules.ContainsRule);
+      expect(rule.descriptor).toBeInstanceOf(Descriptors.FieldDescriptor);
     });
   });
 
   describe('$.Has', () => {
     it('should support $.Has.Field()', () => {
-      const assertion = dsl.$.Has.Field({ key: 'name' });
-      expect(assertion).toBeInstanceOf(Assertions.ContainsAssertion);
-      expect(assertion.descriptor.opts.key).toBe('name');
+      const rule = dsl.$.Has.Field({ key: 'name' });
+      expect(rule).toBeInstanceOf(Rules.ContainsRule);
+      expect(rule.descriptor.opts.key).toBe('name');
     });
 
     it('should support $.Has.RequiredField() syntax sugar', () => {
-      const assertion = dsl.$.Has.RequiredField({ key: 'name' });
-      expect(assertion).toBeInstanceOf(Assertions.ContainsAssertion);
-      expect(assertion.descriptor.opts.key).toBe('name');
-      expect(assertion.descriptor.opts.required).toBe(true);
+      const rule = dsl.$.Has.RequiredField({ key: 'name' });
+      expect(rule).toBeInstanceOf(Rules.ContainsRule);
+      expect(rule.descriptor.opts.key).toBe('name');
+      expect(rule.descriptor.opts.required).toBe(true);
     });
 
     it('should support $.Has.OptionalField() syntax sugar', () => {
-      const assertion = dsl.$.Has.OptionalField({ key: 'description' });
-      expect(assertion).toBeInstanceOf(Assertions.ContainsAssertion);
-      expect(assertion.descriptor.opts.key).toBe('description');
-      expect(assertion.descriptor.opts.required).toBe(false);
+      const rule = dsl.$.Has.OptionalField({ key: 'description' });
+      expect(rule).toBeInstanceOf(Rules.ContainsRule);
+      expect(rule.descriptor.opts.key).toBe('description');
+      expect(rule.descriptor.opts.required).toBe(false);
     });
 
     it('RequiredField should override explicit required: false', () => {
-      const assertion = dsl.$.Has.RequiredField({ key: 'name', required: false });
-      expect(assertion.descriptor.opts.required).toBe(true);
+      const rule = dsl.$.Has.RequiredField({ key: 'name', required: false });
+      expect(rule.descriptor.opts.required).toBe(true);
     });
 
     it('OptionalField should override explicit required: true', () => {
-      const assertion = dsl.$.Has.OptionalField({ key: 'name', required: true });
-      expect(assertion.descriptor.opts.required).toBe(false);
+      const rule = dsl.$.Has.OptionalField({ key: 'name', required: true });
+      expect(rule.descriptor.opts.required).toBe(false);
     });
   });
 
   describe('$.DoesNot', () => {
     it('should support $.DoesNot.Contain()', () => {
-      const assertion = dsl.$.DoesNot.Contain(dsl.File({ path: 'debug.log' }));
-      expect(assertion).toBeInstanceOf(Assertions.NotAssertion);
+      const rule = dsl.$.DoesNot.Contain(dsl.File({ path: 'debug.log' }));
+      expect(rule).toBeInstanceOf(Rules.DoesNot);
     });
   });
 

@@ -2,7 +2,7 @@
 // examples/validate.mjs
 // Example validation runner
 
-import { createConfiguredEngine } from '../src/index.mjs';
+import { createConfiguredEngine } from '../dist/index.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 

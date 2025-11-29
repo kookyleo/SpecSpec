@@ -1,22 +1,37 @@
 {
   "name": "@kookyleo/specspec",
-  "version": "0.1.0",
-  "description": "通用的 Spec DSL 引擎与核心断言库（code-as-spec）。",
+  "version": "0.2.0",
+  "description": "通用的 Spec DSL 引擎与核心规则库（code-as-spec）。",
   "type": "module",
-  "main": "src/index.mjs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "exports": {
-    ".": "./src/index.mjs",
-    "./assertions": "./src/assertions/index.mjs",
-    "./descriptors": "./src/descriptors/index.mjs",
-    "./contexts": "./src/contexts/index.mjs",
-    "./engine": "./src/engine.mjs"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./descriptors": {
+      "types": "./dist/descriptors/index.d.ts",
+      "default": "./dist/descriptors/index.js"
+    },
+    "./rules": {
+      "types": "./dist/rules/index.d.ts",
+      "default": "./dist/rules/index.js"
+    },
+    "./validators": {
+      "types": "./dist/validators/index.d.ts",
+      "default": "./dist/validators/index.js"
+    }
   },
   "scripts": {
-    "test": "vitest run",
+    "build": "tsc",
+    "test": "npm run build && vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "clean": "rm -rf dist"
   },
   "devDependencies": {
+    "@types/node": "^24.10.1",
+    "typescript": "^5.9.3",
     "vitest": "^3.0.0"
   },
   "keywords": [

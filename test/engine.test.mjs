@@ -2,7 +2,7 @@
 // Tests for ValidationEngine
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createConfiguredEngine } from '../src/index.mjs';
+import { createConfiguredEngine } from '../dist/index.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
