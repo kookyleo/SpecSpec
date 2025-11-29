@@ -5,7 +5,19 @@
   "type": "module",
   "main": "src/index.mjs",
   "exports": {
-    ".": "./src/index.mjs"
+    ".": "./src/index.mjs",
+    "./assertions": "./src/assertions/index.mjs",
+    "./descriptors": "./src/descriptors/index.mjs",
+    "./contexts": "./src/contexts/index.mjs",
+    "./engine": "./src/engine.mjs"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0"
   },
   "keywords": [
     "spec",
@@ -15,6 +27,5 @@
     "code-as-spec"
   ],
   "author": "kookyleo",
-  "license": "MIT"
+  "license": "Apache-2.0"
 }
-

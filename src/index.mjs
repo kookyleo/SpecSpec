@@ -1,29 +1,37 @@
 // SpecSpec: 通用 DSL 引擎入口
 
-import * as CoreRules from './core-rules.mjs';
+import * as Assertions from './assertions/index.mjs';
+import * as Descriptors from './descriptors/index.mjs';
 
 export { ValidationEngine } from './engine.mjs';
-export { CoreRules };
+export { Assertions, Descriptors };
 
-// 组装一套“默认 DSL 工厂”，方便业务侧直接使用
+// Re-export context classes for extensibility
+export {
+  TargetExecutionContext,
+  FileExecutionContext,
+  FieldContext,
+} from './contexts/index.mjs';
+
+// 组装一套"默认 DSL 工厂"，方便业务侧直接使用
 export function createCoreDsl() {
   // 逻辑否定：接受一个断言实例，返回其 Not 包装
-  const Not = (assertion) => new CoreRules.NotAssertion(assertion);
+  const Not = (assertion) => new Assertions.NotAssertion(assertion);
 
   // 类型描述符（供 $.Is.OneOf 使用）
-  const Directory = () => new CoreRules.DirectoryDescriptor();
-  const FileType = (opts) => new CoreRules.FileTypeDescriptor(opts);
+  const Directory = () => new Descriptors.DirectoryDescriptor();
+  const FileType = (opts) => new Descriptors.FileTypeDescriptor(opts);
 
   // 内容描述符（供 $.Contains 使用）
-  const File = (opts) => new CoreRules.FileDescriptor(opts);
-  const Field = (opts) => new CoreRules.FieldDescriptor(opts);
+  const File = (opts) => new Descriptors.FileDescriptor(opts);
+  const Field = (opts) => new Descriptors.FieldDescriptor(opts);
 
   // Is 系列工厂
   const Is = {
-    OneOf: (descriptors) => new CoreRules.IsOneOfAssertion(descriptors),
-    JSON: () => new CoreRules.IsJSONAssertion(),
-    String: () => new CoreRules.IsStringAssertion(),
-    Empty: () => new CoreRules.IsEmptyAssertion(),
+    OneOf: (descriptors) => new Assertions.IsOneOfAssertion(descriptors),
+    JSON: () => new Assertions.IsJSONAssertion(),
+    String: () => new Assertions.IsStringAssertion(),
+    Empty: () => new Assertions.IsEmptyAssertion(),
   };
 
   // 链式否定：$.Is.Not.X()
@@ -32,16 +40,16 @@ export function createCoreDsl() {
   };
 
   // Contains 谓词：既支持 $.Contains(File(...)) 也支持 $.Contains.File(...)
-  const Contains = (descriptor) => new CoreRules.ContainsAssertion(descriptor);
-  Contains.File = (opts) => new CoreRules.ContainsAssertion(File(opts));
-  Contains.Field = (opts) => new CoreRules.ContainsAssertion(Field(opts));
+  const Contains = (descriptor) => new Assertions.ContainsAssertion(descriptor);
+  Contains.File = (opts) => new Assertions.ContainsAssertion(File(opts));
+  Contains.Field = (opts) => new Assertions.ContainsAssertion(Field(opts));
 
   // Has 语义语法糖
   const Has = {
-    Field: (opts) => new CoreRules.ContainsAssertion(Field(opts)),
+    Field: (opts) => new Assertions.ContainsAssertion(Field(opts)),
     // RequiredField/OptionalField 语法糖，等价于 Field({ ...opts, required: true/false })
-    RequiredField: (opts) => new CoreRules.ContainsAssertion(Field({ ...opts, required: true })),
-    OptionalField: (opts) => new CoreRules.ContainsAssertion(Field({ ...opts, required: false })),
+    RequiredField: (opts) => new Assertions.ContainsAssertion(Field({ ...opts, required: true })),
+    OptionalField: (opts) => new Assertions.ContainsAssertion(Field({ ...opts, required: false })),
   };
 
   const $ = {
@@ -52,15 +60,15 @@ export function createCoreDsl() {
     Not,
     // $.DoesNot.Contain(File(...))
     DoesNot: {
-      Contain: (descriptor) => Not(new CoreRules.ContainsAssertion(descriptor)),
+      Contain: (descriptor) => Not(new Assertions.ContainsAssertion(descriptor)),
     },
   };
 
   return {
-    // 容器：唯一的结构化“规则容器”为 Spec
-    // Package 是一个常见的 Descriptor，用于给“包”对象绑定一组规则。
-    Package: (opts) => new CoreRules.PackageAssertion(opts),
-    Spec: (name, rules) => new CoreRules.SpecAssertion(name, rules),
+    // 容器：唯一的结构化"规则容器"为 Spec
+    // Package 是一个常见的 Descriptor，用于给"包"对象绑定一组规则。
+    Package: (opts) => new Assertions.PackageAssertion(opts),
+    Spec: (name, rules) => new Assertions.SpecAssertion(name, rules),
 
     // 逻辑
     Not,
