@@ -1,12 +1,11 @@
-// support/engine.mjs
+// SpecSpec/src/engine.mjs
 // The generic, domain-agnostic validation engine.
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
-import * as CoreRules from './core-rules.mjs';
 
 // --- Execution Context Classes ---
-class PackageExecutionContext {
+class TargetExecutionContext {
     constructor(targetPath) {
         this.path = targetPath;
         this.stat = fs.existsSync(targetPath) ? fs.statSync(targetPath) : null;
@@ -35,6 +34,16 @@ class FileExecutionContext {
         return this._json;
     }
     addIssue(code, message) { this.packageContext.addIssue(code, message, { path: this.filePath }); }
+    createFieldContext(fieldName, fieldValue) { return new FieldContext(this, fieldName, fieldValue); }
+}
+
+class FieldContext {
+    constructor(fileContext, fieldName, fieldValue) {
+        this.fileContext = fileContext;
+        this.fieldName = fieldName;
+        this.value = fieldValue; // The value of the field
+    }
+    addIssue(code, message) { this.fileContext.addIssue(code, message, { path: `${this.fileContext.filePath}#${this.fieldName}` }); }
 }
 
 
@@ -70,9 +79,6 @@ export class ValidationEngine {
         if (factories.$) { // Store $.Is, $.Has, $.Contains
             this.ruleFactories.$ = factories.$;
         }
-        if (factories.Package) { // Store Package() factory
-            this.ruleFactories.Package = factories.Package;
-        }
         // Store other top-level factories like Directory(), File(), ZipFile(), Spec()
         for (const key of ['Directory', 'File', 'ZipFile', 'Spec']) {
             if (factories[key]) {
@@ -83,37 +89,59 @@ export class ValidationEngine {
     
     run(specPath, targetPath) {
         const specCode = fs.readFileSync(specPath, 'utf8');
-        let rootAssertion = null; // This will hold the PackageAssertion instance
+        let rootAssertion = null;
 
-        // The Spec.js code will directly call Package({...}) which will set rootAssertion
-        this.sandboxContext.Package = (opts) => {
-            const assertion = new CoreRules.PackageAssertion(opts); // Uses the CoreRules.PackageAssertion class
-            rootAssertion = assertion;
-            return assertion; // Though not used, consistent with other factories
-        };
+        // Root selection rule:
+        //  - "Spec.js 里第一层写的哪个描述符，哪个描述符就是根"
+        // 实现上：在执行 Spec.js 期间，临时包装所有顶层工厂函数
+        //（除 Spec 本身外），第一次在“无上下文”下调用返回的断言，
+        // 即被视作 rootAssertion。
+        const originalFactories = {};
+        // Wrap top-level factories that exist in the sandbox (e.g., Package, Directory, File, ZipFile, etc.).
+        for (const key of Object.keys(this.sandboxContext)) {
+            if (key === '$' || key === 'Spec') continue;
+            const fn = this.sandboxContext[key];
+            if (typeof fn !== 'function') continue;
+            originalFactories[key] = fn;
+            this.sandboxContext[key] = (...args) => {
+                const assertion = fn(...args);
+                if (this.contextStack.length === 0 && !rootAssertion && assertion && typeof assertion.execute === 'function') {
+                    rootAssertion = assertion;
+                }
+                return assertion;
+            };
+        }
 
         try {
             vm.runInNewContext(specCode, this.sandboxContext, { filename: specPath });
         } catch (err) {
+            // Restore wrapped factories before returning
+            for (const [key, fn] of Object.entries(originalFactories)) {
+                this.sandboxContext[key] = fn;
+            }
             return { ok: false, issues: [{ level: 'error', code: 'spec.crash', message: `Spec file has a syntax error: ${err.message}` }] };
+        }
+
+        // Restore wrapped factories after successful evaluation
+        for (const [key, fn] of Object.entries(originalFactories)) {
+            this.sandboxContext[key] = fn;
         }
 
         if (!rootAssertion) {
             return { ok: false, issues: [{ level: 'error', code: 'spec.empty', message: 'Spec file did not define a root assertion (e.g., Package({...})).' }] };
         }
 
-        const packageContext = new PackageExecutionContext(targetPath);
+        const targetContext = new TargetExecutionContext(targetPath);
         
         try {
-            // Top-level execution starts here. We call executeInContext to bind '$' to packageContext.
-            this.executeInContext(packageContext, () => {
-                rootAssertion.execute(this, packageContext); // Execute the root PackageAssertion
+            this.executeInContext(targetContext, () => {
+                rootAssertion.execute(this, targetContext);
             });
         } catch (err) {
-            packageContext.addIssue('executor.crash', `The validator crashed: ${err.message}`, { stack: err.stack });
+            targetContext.addIssue('executor.crash', `The validator crashed: ${err.message}`, { stack: err.stack });
         }
         
-        return { ok: packageContext.issues.length === 0, issues: packageContext.issues };
+        return { ok: targetContext.issues.length === 0, issues: targetContext.issues };
     }
 
     // This method executes a function (like a rulesFunc or withSpec)
