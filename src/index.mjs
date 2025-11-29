@@ -2,9 +2,11 @@
 
 import * as Assertions from './assertions/index.mjs';
 import * as Descriptors from './descriptors/index.mjs';
+import * as Validators from './validators/index.mjs';
+import { Spec } from './spec.mjs';
+import { ValidationEngine } from './engine.mjs';
 
-export { ValidationEngine } from './engine.mjs';
-export { Assertions, Descriptors };
+export { ValidationEngine, Assertions, Descriptors, Validators, Spec };
 
 // Re-export context classes for extensibility
 export {
@@ -15,14 +17,15 @@ export {
 
 // 组装一套"默认 DSL 工厂"，方便业务侧直接使用
 export function createCoreDsl() {
-  // 逻辑否定：接受一个断言实例，返回其 Not 包装
+  // 逻辑否定
   const Not = (assertion) => new Assertions.NotAssertion(assertion);
 
   // 类型描述符（供 $.Is.OneOf 使用）
-  const Directory = () => new Descriptors.DirectoryDescriptor();
+  const Directory = (opts) => new Descriptors.DirectoryDescriptor(opts);
   const FileType = (opts) => new Descriptors.FileTypeDescriptor(opts);
 
   // 内容描述符（供 $.Contains 使用）
+  const Package = (opts) => new Descriptors.PackageDescriptor(opts);
   const File = (opts) => new Descriptors.FileDescriptor(opts);
   const Field = (opts) => new Descriptors.FieldDescriptor(opts);
 
@@ -39,7 +42,7 @@ export function createCoreDsl() {
     Empty: () => Not(Is.Empty()),
   };
 
-  // Contains 谓词：既支持 $.Contains(File(...)) 也支持 $.Contains.File(...)
+  // Contains 谓词
   const Contains = (descriptor) => new Assertions.ContainsAssertion(descriptor);
   Contains.File = (opts) => new Assertions.ContainsAssertion(File(opts));
   Contains.Field = (opts) => new Assertions.ContainsAssertion(Field(opts));
@@ -47,7 +50,6 @@ export function createCoreDsl() {
   // Has 语义语法糖
   const Has = {
     Field: (opts) => new Assertions.ContainsAssertion(Field(opts)),
-    // RequiredField/OptionalField 语法糖，等价于 Field({ ...opts, required: true/false })
     RequiredField: (opts) => new Assertions.ContainsAssertion(Field({ ...opts, required: true })),
     OptionalField: (opts) => new Assertions.ContainsAssertion(Field({ ...opts, required: false })),
   };
@@ -56,30 +58,43 @@ export function createCoreDsl() {
     Is,
     Contains,
     Has,
-    // 前缀否定：$.Not($.Is.Empty())
     Not,
-    // $.DoesNot.Contain(File(...))
     DoesNot: {
       Contain: (descriptor) => Not(new Assertions.ContainsAssertion(descriptor)),
     },
   };
 
   return {
-    // 容器：唯一的结构化"规则容器"为 Spec
-    // Package 是一个常见的 Descriptor，用于给"包"对象绑定一组规则。
-    Package: (opts) => new Assertions.PackageAssertion(opts),
-    Spec: (name, rules) => new Assertions.SpecAssertion(name, rules),
+    // 规则容器
+    Spec: (name, rules) => new Spec(name, rules),
+
+    // 描述符
+    Package,
+    Directory,
+    FileType,
+    File,
+    Field,
 
     // 逻辑
     Not,
 
     // 主语 $
     $,
-
-    // 描述符
-    Directory,
-    FileType,
-    File,
-    Field,
   };
+}
+
+// 创建引擎并注册默认配置
+export function createConfiguredEngine() {
+  const engine = new ValidationEngine();
+
+  engine.registerValidator(Descriptors.PackageDescriptor, new Validators.PackageValidator());
+  engine.registerValidator(Descriptors.FileDescriptor, new Validators.FileValidator());
+  engine.registerValidator(Descriptors.FieldDescriptor, new Validators.FieldValidator());
+  engine.registerValidator(Descriptors.DirectoryDescriptor, new Validators.DirectoryMatcher());
+  engine.registerValidator(Descriptors.FileTypeDescriptor, new Validators.FileTypeMatcher());
+
+  const dsl = createCoreDsl();
+  engine.registerRules(dsl);
+
+  return { engine, dsl };
 }

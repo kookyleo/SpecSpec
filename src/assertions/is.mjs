@@ -1,4 +1,4 @@
-// SpecSpec/src/assertions/is.mjs
+// src/assertions/is.mjs
 // "Is" family assertions - for asserting state or type
 
 import { Assertion } from './base.mjs';
@@ -10,7 +10,13 @@ export class IsOneOfAssertion extends Assertion {
   }
 
   execute(engine, context) {
-    const passedOne = this.descriptors.some(descriptor => descriptor.execute(engine, context));
+    const passedOne = this.descriptors.some(descriptor => {
+      const matcher = engine.getValidator(descriptor);
+      if (matcher && typeof matcher.matches === 'function') {
+        return matcher.matches(descriptor, engine, context);
+      }
+      return false;
+    });
     if (!passedOne) {
       context.addIssue('target.is.oneof.fail', 'Target does not match any of the specified types.');
     }

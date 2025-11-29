@@ -1,12 +1,10 @@
-// SpecSpec/src/assertions/index.mjs
+// src/assertions/index.mjs
 // Re-export all assertion classes
 
 export {
   Assertion,
   getIssueArray,
   NotAssertion,
-  SpecAssertion,
-  PackageAssertion,
 } from './base.mjs';
 
 export {

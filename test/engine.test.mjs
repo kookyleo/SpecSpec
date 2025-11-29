@@ -1,9 +1,8 @@
 // test/engine.test.mjs
 // Tests for ValidationEngine
 
-import { describe, it, expect, beforeAll } from 'vitest';
-import { ValidationEngine, createCoreDsl } from '../src/index.mjs';
-import fs from 'node:fs';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { createConfiguredEngine } from '../src/index.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -12,12 +11,10 @@ const fixturesDir = path.join(__dirname, 'fixtures');
 
 describe('ValidationEngine', () => {
   let engine;
-  let dsl;
 
-  beforeAll(() => {
-    engine = new ValidationEngine();
-    dsl = createCoreDsl();
-    engine.registerRules(dsl);
+  beforeEach(() => {
+    const configured = createConfiguredEngine();
+    engine = configured.engine;
   });
 
   describe('run()', () => {

@@ -2,7 +2,7 @@
 // Tests for DSL factory functions
 
 import { describe, it, expect } from 'vitest';
-import { createCoreDsl, Assertions, Descriptors } from '../src/index.mjs';
+import { createCoreDsl, Assertions, Descriptors, Spec } from '../src/index.mjs';
 
 describe('createCoreDsl', () => {
   const dsl = createCoreDsl();
@@ -121,22 +121,22 @@ describe('createCoreDsl', () => {
   });
 
   describe('Spec', () => {
-    it('should create SpecAssertion with name and rules', () => {
+    it('should create Spec with name and rules', () => {
       const spec = dsl.Spec('Test Spec', [
         dsl.$.Is.JSON(),
       ]);
-      expect(spec).toBeInstanceOf(Assertions.SpecAssertion);
+      expect(spec).toBeInstanceOf(Spec);
       expect(spec.name).toBe('Test Spec');
       expect(spec.rules).toHaveLength(1);
     });
   });
 
   describe('Package', () => {
-    it('should create PackageAssertion', () => {
+    it('should create PackageDescriptor', () => {
       const pkg = dsl.Package({
         withSpec: () => dsl.Spec('Package Rules', []),
       });
-      expect(pkg).toBeInstanceOf(Assertions.PackageAssertion);
+      expect(pkg).toBeInstanceOf(Descriptors.PackageDescriptor);
     });
   });
 });

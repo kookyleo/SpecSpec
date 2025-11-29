@@ -5,14 +5,12 @@ import { describe, it, expect } from 'vitest';
 import {
   Assertion,
   NotAssertion,
-  SpecAssertion,
-  PackageAssertion,
   IsJSONAssertion,
   IsStringAssertion,
   IsEmptyAssertion,
   ContainsAssertion,
 } from '../src/assertions/index.mjs';
-import { FieldDescriptor } from '../src/descriptors/index.mjs';
+import { Spec } from '../src/spec.mjs';
 
 describe('Assertion base class', () => {
   it('should throw if execute is not implemented', () => {
@@ -30,11 +28,9 @@ describe('NotAssertion', () => {
       }
     };
 
-    // Create a passing assertion (IsEmptyAssertion on empty string)
     const passingAssertion = new IsEmptyAssertion();
     const notAssertion = new NotAssertion(passingAssertion);
 
-    // Execute with empty value (IsEmpty would pass, so Not should fail)
     notAssertion.execute({}, { ...mockContext, value: '' });
 
     expect(mockContext.issues.length).toBe(1);
@@ -49,32 +45,23 @@ describe('NotAssertion', () => {
       }
     };
 
-    // Create a failing assertion (IsEmptyAssertion on non-empty string)
     const failingAssertion = new IsEmptyAssertion();
     const notAssertion = new NotAssertion(failingAssertion);
 
-    // Execute with non-empty value (IsEmpty would fail, so Not should pass)
     notAssertion.execute({}, { ...mockContext, value: 'hello' });
 
     expect(mockContext.issues.length).toBe(0);
   });
 });
 
-describe('SpecAssertion', () => {
-  it('should execute all rules in order', () => {
-    const executed = [];
+describe('Spec', () => {
+  it('should be a simple container with name and rules', () => {
+    const rules = [new IsStringAssertion()];
+    const spec = new Spec('Test Spec', rules);
 
-    const mockRule1 = {
-      execute: () => executed.push(1)
-    };
-    const mockRule2 = {
-      execute: () => executed.push(2)
-    };
-
-    const spec = new SpecAssertion('Test Spec', [mockRule1, mockRule2]);
-    spec.execute({}, {});
-
-    expect(executed).toEqual([1, 2]);
+    expect(spec.name).toBe('Test Spec');
+    expect(spec.rules).toBe(rules);
+    expect(spec.rules).toHaveLength(1);
   });
 });
 
@@ -175,15 +162,31 @@ describe('IsEmptyAssertion', () => {
 });
 
 describe('ContainsAssertion', () => {
-  it('should delegate to descriptor.execute()', () => {
-    let executeCalled = false;
-    const mockDescriptor = {
-      execute: () => { executeCalled = true; }
+  it('should call engine.getValidator() with descriptor', () => {
+    const mockDescriptor = { opts: {} };
+    let validatorCalled = false;
+
+    const mockValidator = {
+      validate: () => { validatorCalled = true; }
+    };
+
+    const mockEngine = {
+      getValidator: () => mockValidator
     };
 
     const assertion = new ContainsAssertion(mockDescriptor);
-    assertion.execute({}, {});
+    assertion.execute(mockEngine, {});
 
-    expect(executeCalled).toBe(true);
+    expect(validatorCalled).toBe(true);
+  });
+
+  it('should throw if no validator found', () => {
+    const mockDescriptor = { constructor: { name: 'TestDescriptor' }, opts: {} };
+    const mockEngine = {
+      getValidator: () => null
+    };
+
+    const assertion = new ContainsAssertion(mockDescriptor);
+    expect(() => assertion.execute(mockEngine, {})).toThrow(/No validator found/);
   });
 });

@@ -1,4 +1,4 @@
-// SpecSpec/src/engine.mjs
+// src/engine.mjs
 // The generic, domain-agnostic validation engine.
 
 import fs from 'node:fs';
@@ -8,6 +8,7 @@ import { TargetExecutionContext } from './contexts/index.mjs';
 export class ValidationEngine {
   constructor() {
     this.ruleFactories = {};
+    this.validators = new Map(); // Descriptor class -> Validator instance
     this.contextStack = [];
 
     const handler = {
@@ -32,13 +33,23 @@ export class ValidationEngine {
     this.sandboxContext = vm.createContext({ $: this.proxy$, console: console });
   }
 
+  // Register a validator for a descriptor class
+  registerValidator(descriptorClass, validator) {
+    this.validators.set(descriptorClass, validator);
+  }
+
+  // Get validator for a descriptor instance
+  getValidator(descriptor) {
+    return this.validators.get(descriptor.constructor);
+  }
+
   registerRules(factories) {
     Object.assign(this.sandboxContext, factories);
     // Store DSL categories for the proxy handler
     if (factories.$) {
       this.ruleFactories.$ = factories.$;
     }
-    // Store other top-level factories like Directory(), File(), ZipFile(), Spec()
+    // Store other top-level factories
     for (const key of ['Directory', 'File', 'ZipFile', 'Spec']) {
       if (factories[key]) {
         this.ruleFactories[key] = factories[key];
@@ -48,7 +59,7 @@ export class ValidationEngine {
 
   run(specPath, targetPath) {
     const specCode = fs.readFileSync(specPath, 'utf8');
-    let rootAssertion = null;
+    let rootDescriptor = null;
 
     // Root selection rule:
     // The first descriptor written at the top level becomes the root.
@@ -59,11 +70,12 @@ export class ValidationEngine {
       if (typeof fn !== 'function') continue;
       originalFactories[key] = fn;
       this.sandboxContext[key] = (...args) => {
-        const assertion = fn(...args);
-        if (this.contextStack.length === 0 && !rootAssertion && assertion && typeof assertion.execute === 'function') {
-          rootAssertion = assertion;
+        const result = fn(...args);
+        // Capture first descriptor at root level
+        if (this.contextStack.length === 0 && !rootDescriptor && result && result.opts !== undefined) {
+          rootDescriptor = result;
         }
-        return assertion;
+        return result;
       };
     }
 
@@ -87,13 +99,13 @@ export class ValidationEngine {
       this.sandboxContext[key] = fn;
     }
 
-    if (!rootAssertion) {
+    if (!rootDescriptor) {
       return {
         ok: false,
         issues: [{
           level: 'error',
           code: 'spec.empty',
-          message: 'Spec file did not define a root assertion (e.g., Package({...})).'
+          message: 'Spec file did not define a root descriptor (e.g., Package({...})).'
         }]
       };
     }
@@ -101,9 +113,12 @@ export class ValidationEngine {
     const targetContext = new TargetExecutionContext(targetPath);
 
     try {
-      this.executeInContext(targetContext, () => {
-        rootAssertion.execute(this, targetContext);
-      });
+      // Get validator for root descriptor and execute
+      const validator = this.getValidator(rootDescriptor);
+      if (!validator) {
+        throw new Error(`No validator found for root descriptor: ${rootDescriptor.constructor.name}`);
+      }
+      validator.validate(rootDescriptor, this, targetContext);
     } catch (err) {
       targetContext.addIssue('executor.crash', `The validator crashed: ${err.message}`, { stack: err.stack });
     }
