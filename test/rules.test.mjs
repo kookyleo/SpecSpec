@@ -3,8 +3,8 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  IsNot,
-  DoesNot,
+  IsNotRule,
+  DoesNotRule,
   IsJSONRule,
   IsStringRule,
   IsEmptyRule,
@@ -12,7 +12,7 @@ import {
 } from '../dist/rules/index.js';
 import { Spec } from '../dist/spec.js';
 
-describe('IsNot', () => {
+describe('IsNotRule', () => {
   it('should invert a passing rule to fail', () => {
     const mockContext = {
       issues: [],
@@ -22,7 +22,7 @@ describe('IsNot', () => {
     };
 
     const passingRule = new IsEmptyRule();
-    const isNotRule = new IsNot(passingRule);
+    const isNotRule = new IsNotRule(passingRule);
 
     isNotRule.execute({}, { ...mockContext, value: '' });
 
@@ -39,7 +39,7 @@ describe('IsNot', () => {
     };
 
     const failingRule = new IsEmptyRule();
-    const isNotRule = new IsNot(failingRule);
+    const isNotRule = new IsNotRule(failingRule);
 
     isNotRule.execute({}, { ...mockContext, value: 'hello' });
 
@@ -47,7 +47,7 @@ describe('IsNot', () => {
   });
 });
 
-describe('DoesNot', () => {
+describe('DoesNotRule', () => {
   it('should pass when inner ContainsRule fails', () => {
     const mockContext = {
       issues: [],
@@ -67,7 +67,7 @@ describe('DoesNot', () => {
     };
 
     const containsRule = new ContainsRule(mockDescriptor);
-    const doesNotRule = new DoesNot(containsRule, mockDescriptor);
+    const doesNotRule = new DoesNotRule(containsRule, mockDescriptor);
 
     doesNotRule.execute(mockEngine, mockContext);
 
@@ -92,7 +92,7 @@ describe('DoesNot', () => {
     };
 
     const containsRule = new ContainsRule(mockDescriptor);
-    const doesNotRule = new DoesNot(containsRule, mockDescriptor);
+    const doesNotRule = new DoesNotRule(containsRule, mockDescriptor);
 
     doesNotRule.execute(mockEngine, mockContext);
 

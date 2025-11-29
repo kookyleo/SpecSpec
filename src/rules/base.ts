@@ -46,10 +46,10 @@ abstract class NegationRule implements Rule {
 }
 
 /**
- * IsNot - Negation for Is* rules.
+ * IsNotRule - Negation for Is* rules.
  * Usage: $.IsNot.Empty(), $.IsNot.JSON()
  */
-export class IsNot extends NegationRule {
+export class IsNotRule extends NegationRule {
   protected getFailureCode(): string {
     return 'is.not.fail';
   }
@@ -60,10 +60,10 @@ export class IsNot extends NegationRule {
 }
 
 /**
- * DoesNot - Negation for Contains rules.
+ * DoesNotRule - Negation for Contains rules.
  * Usage: $.DoesNot.Contain(File({ path: 'debug.log' }))
  */
-export class DoesNot extends NegationRule {
+export class DoesNotRule extends NegationRule {
   constructor(
     innerRule: Rule,
     private readonly descriptor: Descriptor

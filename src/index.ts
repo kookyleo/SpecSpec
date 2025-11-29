@@ -54,9 +54,9 @@ export function createCoreDsl() {
 
   // $.IsNot 系列
   const IsNot: IsNotPredicates = {
-    Empty: () => new Rules.IsNot(new Rules.IsEmptyRule()),
-    JSON: () => new Rules.IsNot(new Rules.IsJSONRule()),
-    String: () => new Rules.IsNot(new Rules.IsStringRule()),
+    Empty: () => new Rules.IsNotRule(new Rules.IsEmptyRule()),
+    JSON: () => new Rules.IsNotRule(new Rules.IsJSONRule()),
+    String: () => new Rules.IsNotRule(new Rules.IsStringRule()),
   };
 
   // $.Contains 谓词：既支持 $.Contains(File(...)) 也支持 $.Contains.File(...)
@@ -87,7 +87,7 @@ export function createCoreDsl() {
   const DoesNot: DoesNotPredicates = {
     Contain: (descriptor: Descriptor): Rule => {
       const containsRule = new Rules.ContainsRule(descriptor);
-      return new Rules.DoesNot(containsRule, descriptor);
+      return new Rules.DoesNotRule(containsRule, descriptor);
     },
   };
 

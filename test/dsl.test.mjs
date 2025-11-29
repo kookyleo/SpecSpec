@@ -59,17 +59,17 @@ describe('createCoreDsl', () => {
   describe('$.IsNot', () => {
     it('should support $.IsNot.Empty()', () => {
       const rule = dsl.$.IsNot.Empty();
-      expect(rule).toBeInstanceOf(Rules.IsNot);
+      expect(rule).toBeInstanceOf(Rules.IsNotRule);
     });
 
     it('should support $.IsNot.JSON()', () => {
       const rule = dsl.$.IsNot.JSON();
-      expect(rule).toBeInstanceOf(Rules.IsNot);
+      expect(rule).toBeInstanceOf(Rules.IsNotRule);
     });
 
     it('should support $.IsNot.String()', () => {
       const rule = dsl.$.IsNot.String();
-      expect(rule).toBeInstanceOf(Rules.IsNot);
+      expect(rule).toBeInstanceOf(Rules.IsNotRule);
     });
   });
 
@@ -127,7 +127,7 @@ describe('createCoreDsl', () => {
   describe('$.DoesNot', () => {
     it('should support $.DoesNot.Contain()', () => {
       const rule = dsl.$.DoesNot.Contain(dsl.File({ path: 'debug.log' }));
-      expect(rule).toBeInstanceOf(Rules.DoesNot);
+      expect(rule).toBeInstanceOf(Rules.DoesNotRule);
     });
   });
 
