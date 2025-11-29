@@ -36,9 +36,12 @@ export function createCoreDsl() {
   Contains.File = (opts) => new CoreRules.ContainsAssertion(File(opts));
   Contains.Field = (opts) => new CoreRules.ContainsAssertion(Field(opts));
 
-  // Has 语义语法糖：目前仅 Field -> Contains(Field)
+  // Has 语义语法糖
   const Has = {
     Field: (opts) => new CoreRules.ContainsAssertion(Field(opts)),
+    // RequiredField/OptionalField 语法糖，等价于 Field({ ...opts, required: true/false })
+    RequiredField: (opts) => new CoreRules.ContainsAssertion(Field({ ...opts, required: true })),
+    OptionalField: (opts) => new CoreRules.ContainsAssertion(Field({ ...opts, required: false })),
   };
 
   const $ = {
