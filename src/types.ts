@@ -181,6 +181,7 @@ export interface FieldDescriptorOptions extends DescriptorOptions {
   is?: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface DirectoryDescriptorOptions extends DescriptorOptions {
-  // Currently no options
+  // Reserved for future options
 }
