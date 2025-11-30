@@ -1,132 +1,28 @@
 // src/index.ts
-// SpecSpec: 通用 DSL 引擎入口
+// Main entry point for @specspec/core
 
-import { ValidationEngine } from './engine.js';
-import { Spec } from './spec.js';
-import * as Descriptors from './descriptors/index.js';
-import * as Rules from './rules/index.js';
-import * as Validators from './validators/index.js';
-import type {
-  Engine,
-  Rule,
-  Descriptor,
-  DollarSign,
-  IsPredicates,
-  IsNotPredicates,
-  ContainsFactory,
-  HasFactory,
-  DoesNotPredicates,
-} from './types.js';
+// Base classes
+export { Type, Modifier, validateAny, tryMatch } from './base.js';
+export type { Validatable, LiteralValue, ObjectSpec } from './base.js';
 
-export { ValidationEngine } from './engine.js';
-export { Spec } from './spec.js';
-export * from './descriptors/index.js';
-export * from './rules/index.js';
-export * from './validators/index.js';
-export * from './contexts/index.js';
-export type * from './types.js';
+// Context
+export { ValidationContext } from './context.js';
+export type { Context, Issue } from './context.js';
 
-// 组装一套"默认 DSL 工厂"，方便业务侧直接使用
-export function createCoreDsl() {
-  // 类型描述符（供 $.Is.OneOf 使用）
-  const Directory = () => new Descriptors.DirectoryDescriptor();
+// Primitive types
+export { Str, StrType, type StrSpec } from './types/primitives.js';
+export { Bool, BoolType, type BoolSpec } from './types/primitives.js';
+export { Num, NumType, type NumSpec } from './types/primitives.js';
 
-  // 内容描述符（供 $.Contains 使用）
-  // File 既可以用于路径匹配，也可以用于类型匹配 (withExtension)
-  const File = (opts: { path?: string; withExtension?: string; withSpec?: () => Spec } = {}) =>
-    new Descriptors.FileDescriptor(opts);
-  const Field = (opts: {
-    key: string;
-    required?: boolean;
-    withSpec?: () => Spec;
-    is?: string;
-  }) => new Descriptors.FieldDescriptor(opts);
-  const Package = (opts: { withSpec?: () => Spec } = {}) =>
-    new Descriptors.PackageDescriptor(opts);
+// Structural types
+export { Field, FieldType, type FieldSpec } from './types/structural.js';
+export { File, FileType, type FileSpec } from './types/structural.js';
+export { Directory, DirectoryType, type DirectorySpec } from './types/structural.js';
+export { JsonFile, JsonFileType, type JsonFileSpec } from './types/structural.js';
 
-  // $.Is 系列
-  const Is: IsPredicates = {
-    OneOf: (descriptors: Descriptor[]) => new Rules.IsOneOfRule(descriptors),
-    JSON: () => new Rules.IsJSONRule(),
-    String: () => new Rules.IsStringRule(),
-    Empty: () => new Rules.IsEmptyRule(),
-  };
+// Modifiers
+export { OneOf, OneOfModifier } from './modifiers/oneof.js';
+export { ListOf, ListOfModifier, type ListOfSpec } from './modifiers/listof.js';
 
-  // $.IsNot 系列
-  const IsNot: IsNotPredicates = {
-    Empty: () => new Rules.IsNotRule(new Rules.IsEmptyRule()),
-    JSON: () => new Rules.IsNotRule(new Rules.IsJSONRule()),
-    String: () => new Rules.IsNotRule(new Rules.IsStringRule()),
-  };
-
-  // $.Contains 谓词：既支持 $.Contains(File(...)) 也支持 $.Contains.File(...)
-  const Contains: ContainsFactory = Object.assign(
-    (descriptor: Descriptor): Rule => new Rules.ContainsRule(descriptor),
-    {
-      File: (opts: { path: string; withSpec?: () => Spec }): Rule =>
-        new Rules.ContainsRule(File(opts)),
-      Field: (opts: {
-        key: string;
-        required?: boolean;
-        withSpec?: () => Spec;
-        is?: string;
-      }): Rule => new Rules.ContainsRule(Field(opts)),
-    }
-  );
-
-  // $.Has 语义语法糖
-  const Has: HasFactory = {
-    Field: (opts) => new Rules.ContainsRule(Field(opts)),
-    RequiredField: (opts: Omit<Parameters<typeof Field>[0], 'required'>) =>
-      new Rules.ContainsRule(Field({ ...opts, required: true })),
-    OptionalField: (opts: Omit<Parameters<typeof Field>[0], 'required'>) =>
-      new Rules.ContainsRule(Field({ ...opts, required: false })),
-  };
-
-  // $.DoesNot 系列
-  const DoesNot: DoesNotPredicates = {
-    Contain: (descriptor: Descriptor): Rule => {
-      const containsRule = new Rules.ContainsRule(descriptor);
-      return new Rules.DoesNotRule(containsRule, descriptor);
-    },
-  };
-
-  const $: DollarSign = {
-    Is,
-    IsNot,
-    Contains,
-    Has,
-    DoesNot,
-  };
-
-  return {
-    // Spec 容器
-    Spec: (name: string, rules: Rule[]) => new Spec(name, rules),
-
-    // 主语 $
-    $,
-
-    // 描述符工厂
-    Package,
-    Directory,
-    File,
-    Field,
-  };
-}
-
-// 创建一个已配置好所有验证器的引擎
-export function createConfiguredEngine(): { engine: Engine; dsl: ReturnType<typeof createCoreDsl> } {
-  const engine = new ValidationEngine();
-  const dsl = createCoreDsl();
-
-  // 注册验证器
-  engine.registerValidator(Descriptors.PackageDescriptor, new Validators.PackageValidator());
-  engine.registerValidator(Descriptors.FileDescriptor, new Validators.FileValidator());
-  engine.registerValidator(Descriptors.FieldDescriptor, new Validators.FieldValidator());
-  engine.registerValidator(Descriptors.DirectoryDescriptor, new Validators.DirectoryValidator());
-
-  // 注册 DSL 规则
-  engine.registerRules(dsl);
-
-  return { engine, dsl };
-}
+// Engine
+export { SpecEngine, createEngine, type ValidationResult, type EngineOptions } from './engine.js';

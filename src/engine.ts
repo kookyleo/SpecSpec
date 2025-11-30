@@ -1,192 +1,163 @@
 // src/engine.ts
-// The generic, domain-agnostic validation engine.
+// SpecEngine - VM sandbox for running spec files
 
 import fs from 'node:fs';
 import vm from 'node:vm';
-import type {
-  Engine,
-  Descriptor,
-  Validator,
-  ExecutionContext,
-  ValidationResult,
-  DescriptorConstructor,
-} from './types.js';
-import { TargetExecutionContext } from './contexts/index.js';
+import { ValidationContext, type Issue } from './context.js';
+import { Type, Modifier, isType, isModifier } from './base.js';
 
-interface RuleFactories {
-  $?: Record<string, unknown>;
-  [key: string]: unknown;
+// Import all built-in types and modifiers
+import * as primitives from './types/primitives.js';
+import * as structural from './types/structural.js';
+import * as modifiers from './modifiers/index.js';
+
+export interface ValidationResult {
+  ok: boolean;
+  issues: Issue[];
 }
 
-interface SandboxContext extends vm.Context {
-  $: Record<string, unknown>;
-  console: Console;
-  _tempFunc?: () => unknown;
-  [key: string]: unknown;
+export interface EngineOptions {
+  /** Custom types to register */
+  types?: Record<string, unknown>;
 }
 
-// Type guard for Descriptor
-function isDescriptor(obj: unknown): obj is Descriptor {
-  return obj !== null && typeof obj === 'object' && 'opts' in obj;
-}
+/**
+ * SpecEngine - loads and runs spec files in a VM sandbox
+ *
+ * @example
+ * const engine = new SpecEngine();
+ * engine.register({ MyType: ... });
+ * const result = engine.run('my.spec.js', '/path/to/target');
+ */
+export class SpecEngine {
+  private readonly globals: Record<string, unknown> = {};
 
-export class ValidationEngine implements Engine {
-  public readonly ruleFactories: RuleFactories = {};
-  private readonly validators = new Map<DescriptorConstructor, Validator>();
-  private readonly contextStack: ExecutionContext[] = [];
-  private readonly proxy$: Record<string, unknown>;
-  private readonly sandboxContext: SandboxContext;
+  constructor(options?: EngineOptions) {
+    // Register built-in primitives
+    this.register({
+      Str: primitives.Str,
+      Bool: primitives.Bool,
+      Num: primitives.Num,
+    });
 
-  constructor() {
-    const handler: ProxyHandler<Record<string, unknown>> = {
-      get: (_target, prop: string) => {
-        // Access DSL methods like $.Is, $.Has
-        const dollarFactories = this.ruleFactories['$'];
-        if (dollarFactories && prop in dollarFactories) {
-          return (dollarFactories as Record<string, unknown>)[prop];
-        }
-        // Access context properties like $.path
-        const currentContext = this.contextStack[this.contextStack.length - 1];
-        if (currentContext && prop in currentContext) {
-          const value = (currentContext as unknown as Record<string, unknown>)[prop];
-          return typeof value === 'function' ? value.bind(currentContext) : value;
-        }
-        // Global DSL factories for descriptors and top-level containers
-        const factory = this.ruleFactories[prop];
-        if (factory !== undefined && typeof factory === 'function') {
-          return factory;
-        }
-        return undefined;
-      },
-    };
-    this.proxy$ = new Proxy({}, handler);
-    this.sandboxContext = vm.createContext({
-      $: this.proxy$,
-      console,
-    }) as SandboxContext;
-  }
+    // Register built-in structural types
+    this.register({
+      Field: structural.Field,
+      File: structural.File,
+      Directory: structural.Directory,
+      JsonFile: structural.JsonFile,
+    });
 
-  registerValidator<D extends Descriptor>(
-    descriptorClass: DescriptorConstructor<D>,
-    validator: Validator<D>
-  ): void {
-    this.validators.set(descriptorClass, validator as Validator);
-  }
+    // Register built-in modifiers
+    this.register({
+      OneOf: modifiers.OneOf,
+      ListOf: modifiers.ListOf,
+    });
 
-  getValidator<D extends Descriptor>(descriptor: D): Validator<D> | undefined {
-    return this.validators.get(descriptor.constructor as DescriptorConstructor) as Validator<D> | undefined;
-  }
-
-  registerRules(factories: Record<string, unknown>): void {
-    Object.assign(this.sandboxContext, factories);
-    // Store DSL categories for the proxy handler
-    const dollarSign = factories['$'];
-    if (dollarSign) {
-      this.ruleFactories['$'] = dollarSign as Record<string, unknown>;
-    }
-    // Store other top-level factories like Directory(), File(), Spec(), Package()
-    for (const key of ['Directory', 'File', 'Spec', 'Package']) {
-      const factory = factories[key];
-      if (factory !== undefined) {
-        this.ruleFactories[key] = factory;
-      }
+    // Register custom types
+    if (options?.types) {
+      this.register(options.types);
     }
   }
 
+  /**
+   * Register types/modifiers to be available in spec files
+   */
+  register(types: Record<string, unknown>): void {
+    Object.assign(this.globals, types);
+  }
+
+  /**
+   * Run a spec file against a target path
+   */
   run(specPath: string, targetPath: string): ValidationResult {
-    const specCode = fs.readFileSync(specPath, 'utf8');
-    let root: Descriptor | null = null;
+    const specCode = fs.readFileSync(specPath, 'utf-8');
+    let rootType: Type | Modifier | null = null;
 
-    // Root selection rule:
-    // The first Descriptor written at the top level becomes the root.
-    const originalFactories: Record<string, (...args: unknown[]) => unknown> = {};
-    for (const key of Object.keys(this.sandboxContext)) {
-      if (key === '$' || key === 'Spec' || key === 'console') continue;
-      const fn = this.sandboxContext[key];
-      if (typeof fn !== 'function') continue;
-      originalFactories[key] = fn as (...args: unknown[]) => unknown;
-      this.sandboxContext[key] = (...args: unknown[]) => {
-        const factory = originalFactories[key];
-        if (!factory) return undefined;
-        const result = factory(...args);
-        if (this.contextStack.length === 0 && !root) {
-          if (isDescriptor(result)) {
-            root = result;
+    // Create sandbox context with all globals
+    // The last top-level expression that produces a Type/Modifier becomes root
+    const sandbox = this.createSandbox((result) => {
+      rootType = result;
+    });
+
+    // Run spec file in sandbox
+    try {
+      vm.runInContext(specCode, sandbox, { filename: specPath });
+    } catch (err) {
+      return {
+        ok: false,
+        issues: [{
+          level: 'error',
+          code: 'spec.syntax_error',
+          message: `Spec file error: ${(err as Error).message}`,
+          path: [],
+        }],
+      };
+    }
+
+    // Check root type was defined
+    if (!rootType) {
+      return {
+        ok: false,
+        issues: [{
+          level: 'error',
+          code: 'spec.no_root',
+          message: 'Spec file must define a root type (e.g., Directory({ ... }))',
+          path: [],
+        }],
+      };
+    }
+
+    // Validate target
+    const ctx = new ValidationContext([], targetPath);
+    // TypeScript narrowing doesn't work well across closures, use assertion
+    const root = rootType as Type | Modifier;
+
+    try {
+      root.validate(targetPath, ctx);
+    } catch (err) {
+      ctx.addIssue('engine.error', `Validation error: ${(err as Error).message}`);
+    }
+
+    return {
+      ok: ctx.issues.filter(i => i.level === 'error').length === 0,
+      issues: ctx.issues,
+    };
+  }
+
+  /**
+   * Create a VM sandbox with all registered globals
+   */
+  private createSandbox(onRoot: (root: Type | Modifier) => void): vm.Context {
+    const wrappedGlobals: Record<string, unknown> = {};
+
+    // Wrap each global to capture root
+    for (const [name, value] of Object.entries(this.globals)) {
+      if (typeof value === 'function') {
+        wrappedGlobals[name] = (...args: unknown[]) => {
+          const result = (value as (...args: unknown[]) => unknown)(...args);
+          if (isType(result) || isModifier(result)) {
+            onRoot(result);
           }
-        }
-        return result;
-      };
-    }
-
-    try {
-      vm.runInNewContext(specCode, this.sandboxContext, { filename: specPath });
-    } catch (err) {
-      for (const [key, fn] of Object.entries(originalFactories)) {
-        this.sandboxContext[key] = fn;
+          return result;
+        };
+        // Copy static properties (like _default)
+        Object.assign(wrappedGlobals[name] as object, value);
+      } else {
+        wrappedGlobals[name] = value;
       }
-      return {
-        ok: false,
-        issues: [
-          {
-            level: 'error',
-            code: 'spec.crash',
-            message: `Spec file has a syntax error: ${(err as Error).message}`,
-          },
-        ],
-      };
     }
 
-    for (const [key, fn] of Object.entries(originalFactories)) {
-      this.sandboxContext[key] = fn;
-    }
-
-    if (!root) {
-      return {
-        ok: false,
-        issues: [
-          {
-            level: 'error',
-            code: 'spec.empty',
-            message: 'Spec file did not define a root (e.g., Package({...})).',
-          },
-        ],
-      };
-    }
-
-    const targetContext = new TargetExecutionContext(targetPath);
-    const rootDescriptor: Descriptor = root;
-
-    try {
-      this.executeInContext(targetContext, () => {
-        const validator = this.getValidator(rootDescriptor);
-        if (validator) {
-          validator.validate(rootDescriptor, this, targetContext);
-        } else {
-          targetContext.addIssue(
-            'validator.missing',
-            `No validator found for: ${rootDescriptor.constructor.name}`
-          );
-        }
-      });
-    } catch (err) {
-      targetContext.addIssue('executor.crash', `The validator crashed: ${(err as Error).message}`);
-    }
-
-    return { ok: targetContext.issues.length === 0, issues: targetContext.issues };
+    return vm.createContext({
+      ...wrappedGlobals,
+      console, // Allow console for debugging
+    });
   }
+}
 
-  // Execute a function within the VM sandbox with '$' bound to the provided context.
-  executeInContext<T>(context: ExecutionContext, func: () => T): T {
-    this.contextStack.push(context);
-    this.sandboxContext['_tempFunc'] = func;
-    this.proxy$['currentContext'] = context;
-
-    const result = vm.runInNewContext('_tempFunc()', this.sandboxContext) as T;
-
-    delete this.sandboxContext['_tempFunc'];
-    this.contextStack.pop();
-    this.proxy$['currentContext'] = this.contextStack[this.contextStack.length - 1] ?? null;
-
-    return result;
-  }
+/**
+ * Create a new SpecEngine with default configuration
+ */
+export function createEngine(options?: EngineOptions): SpecEngine {
+  return new SpecEngine(options);
 }

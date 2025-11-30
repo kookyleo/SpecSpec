@@ -1,7 +1,7 @@
 {
-  "name": "@kookyleo/specspec",
-  "version": "0.2.0",
-  "description": "通用的 Spec DSL 引擎与核心规则库（code-as-spec）。",
+  "name": "@specspec/core",
+  "version": "0.3.0",
+  "description": "A declarative DSL engine for validation specs (code-as-spec).",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -10,17 +10,13 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./descriptors": {
-      "types": "./dist/descriptors/index.d.ts",
-      "default": "./dist/descriptors/index.js"
+    "./types": {
+      "types": "./dist/types/index.d.ts",
+      "default": "./dist/types/index.js"
     },
-    "./rules": {
-      "types": "./dist/rules/index.d.ts",
-      "default": "./dist/rules/index.js"
-    },
-    "./validators": {
-      "types": "./dist/validators/index.d.ts",
-      "default": "./dist/validators/index.js"
+    "./modifiers": {
+      "types": "./dist/modifiers/index.d.ts",
+      "default": "./dist/modifiers/index.js"
     }
   },
   "scripts": {
@@ -43,8 +39,13 @@
     "dsl",
     "validation",
     "engine",
-    "code-as-spec"
+    "code-as-spec",
+    "schema"
   ],
-  "author": "kookyleo",
-  "license": "Apache-2.0"
+  "author": "kookyleo <kookyleo@gmail.com>",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kookyleo/specspec.git"
+  }
 }
