@@ -18,7 +18,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "tsc && cp src/codegen/prelude.py dist/codegen/",
+    "build": "tsc && mkdir -p dist/codegen/python dist/codegen/typescript dist/codegen/swift dist/codegen/rust && cp src/codegen/python/prelude.py dist/codegen/python/ && cp src/codegen/typescript/prelude.ts dist/codegen/typescript/ && cp src/codegen/swift/prelude.swift dist/codegen/swift/ && cp src/codegen/rust/prelude.rs dist/codegen/rust/",
     "build:all": "npm run build && npm run build -w @specspec/types",
     "test": "npm run build && vitest run",
     "test:watch": "vitest",
@@ -27,6 +27,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
+    "@types/adm-zip": "^0.5.7",
     "@types/node": "^24.10.1",
     "eslint": "^9.0.0",
     "typescript": "^5.9.3",
@@ -46,5 +47,8 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/kookyleo/specspec.git"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.16"
   }
 }

@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { SpecEngine } from './engine.js';
 import { generateDoc } from './doc.js';
-import { generatePython } from './codegen/index.js';
+import { getGenerators, getSupportedLanguages } from './codegen/index.js';
 import { Type, Modifier } from './base.js';
 
 const args = process.argv.slice(2);
@@ -26,7 +26,7 @@ Options:
   -t, --types <file>   Load custom types (can be used multiple times)
   --json               Output results as JSON
   --doc                Generate Markdown documentation from spec file
-  --codegen <lang>     Generate validator code (supported: python)
+  --codegen <lang>     Generate validator code (use --help for supported languages)
   -o, --output <file>  Write output to file instead of stdout
   --help, -h           Show this help message
   --version, -v        Show version
@@ -308,8 +308,9 @@ async function generateCode(opts: Options) {
   }
 
   // Check supported language
-  const supportedLangs = ['python'];
-  if (!supportedLangs.includes(lang)) {
+  const generators = getGenerators();
+  const supportedLangs = getSupportedLanguages();
+  if (!generators.has(lang)) {
     console.error(`Error: Unsupported language: ${lang}`);
     console.error(`Supported languages: ${supportedLangs.join(', ')}`);
     process.exit(1);
@@ -355,14 +356,10 @@ async function generateCode(opts: Options) {
   // Get type description
   const desc = (root as Type | Modifier).describe();
 
-  // Generate code
-  let code: string;
-  if (lang === 'python') {
-    code = generatePython(desc);
-  } else {
-    console.error(`Error: Code generation not implemented for: ${lang}`);
-    process.exit(1);
-  }
+  // Generate code using registered generator
+  const generatorFactory = generators.get(lang)!;
+  const generator = generatorFactory();
+  const code = generator.generate(desc);
 
   // Output
   if (opts.output) {
@@ -378,6 +375,7 @@ async function generateCode(opts: Options) {
 async function main() {
   if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
     console.log(help);
+    console.log(`Supported codegen languages: ${getSupportedLanguages().join(', ')}\n`);
     process.exit(0);
   }
 
