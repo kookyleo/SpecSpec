@@ -126,6 +126,26 @@ export class SpecEngine {
   }
 
   /**
+   * Parse a spec file and return the root type (for documentation generation)
+   */
+  parseSpec(specPath: string): Type | Modifier | null {
+    const specCode = fs.readFileSync(specPath, 'utf-8');
+    let rootType: Type | Modifier | null = null;
+
+    const sandbox = this.createSandbox((result) => {
+      rootType = result;
+    });
+
+    try {
+      vm.runInContext(specCode, sandbox, { filename: specPath });
+    } catch {
+      return null;
+    }
+
+    return rootType;
+  }
+
+  /**
    * Create a VM sandbox with all registered globals
    */
   private createSandbox(onRoot: (root: Type | Modifier) => void): vm.Context {

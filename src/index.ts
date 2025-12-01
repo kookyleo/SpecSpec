@@ -3,7 +3,7 @@
 
 // Base classes
 export { Type, Modifier, validateAny, tryMatch } from './base.js';
-export type { Validatable, LiteralValue, ObjectSpec } from './base.js';
+export type { Validatable, LiteralValue, ObjectSpec, TypeDescription } from './base.js';
 
 // Context
 export { ValidationContext } from './context.js';
@@ -26,3 +26,6 @@ export { ListOf, ListOfModifier, type ListOfSpec } from './modifiers/listof.js';
 
 // Engine
 export { SpecEngine, createEngine, type ValidationResult, type EngineOptions } from './engine.js';
+
+// Documentation generator
+export { generateDoc, generateMarkdown, generateJson } from './doc.js';

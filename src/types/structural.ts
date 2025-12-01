@@ -3,8 +3,31 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { Type, validateAny, type Validatable, type ObjectSpec, isObjectSpec } from '../base.js';
+import { Type, Modifier, validateAny, type Validatable, type ObjectSpec, type TypeDescription, isObjectSpec, isType, isModifier, isLiteralValue } from '../base.js';
 import type { Context } from '../context.js';
+
+// Helper to describe any Validatable
+function describeValidatable(v: Validatable | ObjectSpec): TypeDescription {
+  if (isType(v)) {
+    return v.describe();
+  } else if (isModifier(v)) {
+    return (v as Modifier).describe();
+  } else if (isLiteralValue(v)) {
+    if (v instanceof RegExp) {
+      return { name: 'Pattern', constraints: [`matches \`${v}\``] };
+    }
+    return { name: 'Literal', constraints: [`equals ${JSON.stringify(v)}`] };
+  } else if (isObjectSpec(v)) {
+    return {
+      name: 'Object',
+      children: {
+        required: v.required?.map(describeValidatable),
+        optional: v.optional?.map(describeValidatable),
+      },
+    };
+  }
+  return { name: 'Unknown' };
+}
 
 // ═══════════════════════════════════════════════════════════════
 // Field - JSON field type
@@ -48,6 +71,27 @@ export class FieldType extends Type<FieldSpec, Record<string, unknown>> {
         validateAny(value, fieldValue, childCtx);
       }
     }
+  }
+
+  describe(): TypeDescription {
+    const { key, value, optional } = this.spec;
+    const desc: TypeDescription = {
+      name: 'Field',
+      key,
+      optional,
+    };
+
+    if (value !== undefined) {
+      const valueDesc = describeValidatable(value);
+      // Merge value description into field description
+      desc.summary = valueDesc.name;
+      desc.constraints = valueDesc.constraints;
+      desc.children = valueDesc.children;
+      desc.oneOf = valueDesc.oneOf;
+      desc.itemType = valueDesc.itemType;
+    }
+
+    return desc;
   }
 }
 
@@ -139,6 +183,23 @@ export class FileType extends Type<FileSpec | undefined, string> {
       return false;
     }
   }
+
+  describe(): TypeDescription {
+    const constraints: string[] = [];
+    if (this.spec?.ext) {
+      constraints.push(`extension: .${this.spec.ext}`);
+    }
+    const desc: TypeDescription = {
+      name: 'File',
+      key: this.spec?.path,
+      constraints: constraints.length > 0 ? constraints : undefined,
+    };
+    if (this.spec?.content) {
+      const contentDesc = describeValidatable(this.spec.content);
+      desc.children = contentDesc.children ?? { required: [contentDesc] };
+    }
+    return desc;
+  }
 }
 
 const defaultFile = new FileType(undefined);
@@ -215,6 +276,25 @@ export class DirectoryType extends Type<DirectorySpec | undefined, string> {
       return false;
     }
   }
+
+  describe(): TypeDescription {
+    const desc: TypeDescription = {
+      name: 'Directory',
+      key: this.spec?.path,
+    };
+    if (this.spec?.content) {
+      if (isObjectSpec(this.spec.content)) {
+        desc.children = {
+          required: this.spec.content.required?.map(describeValidatable),
+          optional: this.spec.content.optional?.map(describeValidatable),
+        };
+      } else {
+        const contentDesc = describeValidatable(this.spec.content);
+        desc.children = { required: [contentDesc] };
+      }
+    }
+    return desc;
+  }
 }
 
 const defaultDirectory = new DirectoryType(undefined);
@@ -275,6 +355,17 @@ export class JsonFileType extends Type<JsonFileSpec, string> {
     for (const field of optional ?? []) {
       validateAny(field, content, childCtx);
     }
+  }
+
+  describe(): TypeDescription {
+    return {
+      name: 'JsonFile',
+      key: this.spec.path,
+      children: {
+        required: this.spec.required?.map(describeValidatable),
+        optional: this.spec.optional?.map(describeValidatable),
+      },
+    };
   }
 }
 

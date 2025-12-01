@@ -1,7 +1,7 @@
 // src/types/primitives.ts
 // 基础类型：Str, Bool, Num
 
-import { Type } from '../base.js';
+import { Type, type TypeDescription } from '../base.js';
 import type { Context } from '../context.js';
 
 // ═══════════════════════════════════════════════════════════════
@@ -36,6 +36,20 @@ export class StrType extends Type<StrSpec | undefined, string> {
       ctx.addIssue('str.pattern_mismatch', `String does not match pattern ${spec.match}`);
     }
   }
+
+  describe(): TypeDescription {
+    const constraints: string[] = [];
+    if (this.spec?.minLength !== undefined) {
+      constraints.push(`minimum ${this.spec.minLength} characters`);
+    }
+    if (this.spec?.maxLength !== undefined) {
+      constraints.push(`maximum ${this.spec.maxLength} characters`);
+    }
+    if (this.spec?.match) {
+      constraints.push(`matches \`${this.spec.match}\``);
+    }
+    return { name: 'String', constraints: constraints.length > 0 ? constraints : undefined };
+  }
 }
 
 // DSL 工厂
@@ -59,6 +73,14 @@ export class BoolType extends Type<BoolSpec | undefined, boolean> {
       ctx.addIssue('type.mismatch', `Expected boolean, got ${typeof value}`);
       return;
     }
+  }
+
+  describe(): TypeDescription {
+    const constraints: string[] = [];
+    if (this.spec?.default !== undefined) {
+      constraints.push(`default: ${this.spec.default}`);
+    }
+    return { name: 'Boolean', constraints: constraints.length > 0 ? constraints : undefined };
   }
 }
 
@@ -99,6 +121,20 @@ export class NumType extends Type<NumSpec | undefined, number> {
     if (spec.max !== undefined && value > spec.max) {
       ctx.addIssue('num.too_large', `Number ${value} exceeds maximum ${spec.max}`);
     }
+  }
+
+  describe(): TypeDescription {
+    const constraints: string[] = [];
+    if (this.spec?.integer) {
+      constraints.push('integer');
+    }
+    if (this.spec?.min !== undefined) {
+      constraints.push(`minimum ${this.spec.min}`);
+    }
+    if (this.spec?.max !== undefined) {
+      constraints.push(`maximum ${this.spec.max}`);
+    }
+    return { name: 'Number', constraints: constraints.length > 0 ? constraints : undefined };
   }
 }
 

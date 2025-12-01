@@ -4,6 +4,33 @@
 import type { Context, Issue } from './context.js';
 
 /**
+ * Type description for documentation generation
+ */
+export interface TypeDescription {
+  /** Type name (e.g., "String", "Number", "Field") */
+  name: string;
+  /** Key/path for this item (e.g., field key, file path) */
+  key?: string | undefined;
+  /** Short description */
+  summary?: string | undefined;
+  /** List of constraints (e.g., ["minimum 1 character", "matches /^[a-z]+$/"]) */
+  constraints?: string[] | undefined;
+  /** Whether this item is optional */
+  optional?: boolean | undefined;
+  /** Child items for structural types */
+  children?: {
+    required?: TypeDescription[] | undefined;
+    optional?: TypeDescription[] | undefined;
+  } | undefined;
+  /** Options for OneOf */
+  oneOf?: TypeDescription[] | undefined;
+  /** Item type for ListOf */
+  itemType?: TypeDescription | undefined;
+  /** Raw spec for custom rendering */
+  spec?: unknown;
+}
+
+/**
  * Type 基类 - 所有类型的基础
  *
  * @template TSpec - 规格类型
@@ -26,6 +53,17 @@ export abstract class Type<TSpec = unknown, TValue = unknown> {
     this.validate(value as TValue, testCtx);
     return testCtx.hasNoErrors();
   }
+
+  /**
+   * Generate description for documentation
+   * Override in subclasses for better docs
+   */
+  describe(): TypeDescription {
+    return {
+      name: this.constructor.name.replace(/Type$/, ''),
+      spec: this.spec,
+    };
+  }
 }
 
 /**
@@ -44,6 +82,16 @@ export abstract class Modifier<TValue = unknown> {
     const testCtx = new TestContext(ctx);
     this.validate(value as TValue, testCtx);
     return testCtx.hasNoErrors();
+  }
+
+  /**
+   * Generate description for documentation
+   * Override in subclasses for better docs
+   */
+  describe(): TypeDescription {
+    return {
+      name: this.constructor.name.replace(/Modifier$/, ''),
+    };
   }
 }
 

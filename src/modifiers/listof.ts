@@ -1,12 +1,29 @@
 // src/modifiers/listof.ts
 // ListOf modifier - validates arrays
 
-import { Modifier, validateAny, type Validatable } from '../base.js';
+import { Modifier, validateAny, type Validatable, type TypeDescription, isType, isModifier, isLiteralValue, isObjectSpec } from '../base.js';
 import type { Context } from '../context.js';
 
 export interface ListOfSpec {
   min?: number;
   max?: number;
+}
+
+// Helper to describe item type
+function describeItem(v: Validatable): TypeDescription {
+  if (isType(v)) {
+    return v.describe();
+  } else if (isModifier(v)) {
+    return v.describe();
+  } else if (isLiteralValue(v)) {
+    if (v instanceof RegExp) {
+      return { name: 'Pattern', constraints: [`matches \`${v}\``] };
+    }
+    return { name: 'Literal', constraints: [`equals ${JSON.stringify(v)}`] };
+  } else if (isObjectSpec(v)) {
+    return { name: 'Object', spec: v };
+  }
+  return { name: 'Unknown' };
 }
 
 export class ListOfModifier extends Modifier<unknown[]> {
@@ -49,6 +66,21 @@ export class ListOfModifier extends Modifier<unknown[]> {
     if (spec?.max !== undefined && value.length > spec.max) return false;
 
     return true;
+  }
+
+  describe(): TypeDescription {
+    const constraints: string[] = [];
+    if (this.spec?.min !== undefined) {
+      constraints.push(`minimum ${this.spec.min} items`);
+    }
+    if (this.spec?.max !== undefined) {
+      constraints.push(`maximum ${this.spec.max} items`);
+    }
+    return {
+      name: 'ListOf',
+      constraints: constraints.length > 0 ? constraints : undefined,
+      itemType: describeItem(this.itemType),
+    };
   }
 }
 

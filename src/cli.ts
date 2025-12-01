@@ -6,6 +6,8 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { SpecEngine } from './engine.js';
+import { generateDoc } from './doc.js';
+import { Type, Modifier } from './base.js';
 
 const args = process.argv.slice(2);
 
@@ -15,11 +17,15 @@ SpecSpec - Validate targets against spec files
 
 Usage:
   specspec <spec-file> <target-path> [options]
+  specspec <spec-file> --doc [options]
   specspec --init [name]
 
 Options:
-  -t, --types <file>   Load custom types from a JS/MJS module
+  -t, --types <file>   Load custom types (can be used multiple times)
   --json               Output results as JSON
+  --doc                Generate documentation from spec file
+  --format <fmt>       Doc format: markdown (default) or json
+  -o, --output <file>  Write output to file instead of stdout
   --help, -h           Show this help message
   --version, -v        Show version
 
@@ -28,22 +34,13 @@ Commands:
 
 Examples:
   specspec package.spec.js ./my-project
-  specspec Spec.js ./bundle -t ./types.mjs
+  specspec Spec.js ./bundle -t ./core.mjs -t ./oauth.mjs
+  specspec Spec.js --doc -o README.md
   specspec --init
-  specspec --init my-package.spec.js
 
-Custom Types Module:
-  Export your types as named exports:
-
-    // my-types.mjs
-    import { Type } from '@specspec/core';
-
-    export class UrlType extends Type {
-      validate(value, ctx) { /* ... */ }
-    }
-    export const Url = (spec) => new UrlType(spec);
-
-  Then use with: specspec spec.js target -t ./my-types.mjs
+Custom Types:
+  Export types as named exports, then load with -t:
+    specspec spec.js target -t ./my-types.mjs
 `;
 
 // Version
@@ -101,21 +98,34 @@ function init(name: string = 'spec.js') {
 interface Options {
   specFile?: string;
   targetPath?: string;
-  typesFile?: string;
+  typesFiles: string[];
   json?: boolean;
+  doc?: boolean;
+  docFormat?: 'markdown' | 'json';
+  output?: string;
 }
 
 function parseArgs(args: string[]): Options {
-  const opts: Options = {};
+  const opts: Options = { typesFiles: [] };
   const positional: string[] = [];
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]!;
     if (arg === '-t' || arg === '--types') {
       const nextArg = args[++i];
-      if (nextArg) opts.typesFile = nextArg;
+      if (nextArg) opts.typesFiles.push(nextArg);
     } else if (arg === '--json') {
       opts.json = true;
+    } else if (arg === '--doc') {
+      opts.doc = true;
+    } else if (arg === '--format') {
+      const nextArg = args[++i];
+      if (nextArg === 'json' || nextArg === 'markdown') {
+        opts.docFormat = nextArg;
+      }
+    } else if (arg === '-o' || arg === '--output') {
+      const nextArg = args[++i];
+      if (nextArg) opts.output = nextArg;
     } else if (!arg.startsWith('-')) {
       positional.push(arg);
     }
@@ -152,8 +162,10 @@ async function validate(opts: Options) {
 
   // Load custom types if specified
   const customTypes: Record<string, unknown> = {};
-  if (opts.typesFile) {
-    const typesPath = path.resolve(process.cwd(), opts.typesFile);
+  const loadedTypesFiles: string[] = [];
+
+  for (const typesFile of opts.typesFiles) {
+    const typesPath = path.resolve(process.cwd(), typesFile);
     if (!fs.existsSync(typesPath)) {
       if (opts.json) {
         console.log(JSON.stringify({ ok: false, issues: [{ level: 'error', code: 'types.not_found', message: `Types file not found: ${typesPath}`, path: [] }] }));
@@ -176,11 +188,12 @@ async function validate(opts: Options) {
           customTypes[key] = value;
         }
       }
+      loadedTypesFiles.push(typesPath);
     } catch (err) {
       if (opts.json) {
-        console.log(JSON.stringify({ ok: false, issues: [{ level: 'error', code: 'types.load_error', message: `Failed to load types: ${(err as Error).message}`, path: [] }] }));
+        console.log(JSON.stringify({ ok: false, issues: [{ level: 'error', code: 'types.load_error', message: `Failed to load types from ${typesPath}: ${(err as Error).message}`, path: [] }] }));
       } else {
-        console.error(`Error loading types file: ${(err as Error).message}`);
+        console.error(`Error loading types file ${typesPath}: ${(err as Error).message}`);
       }
       process.exit(1);
     }
@@ -189,8 +202,8 @@ async function validate(opts: Options) {
   if (!opts.json) {
     console.log(`Spec:   ${specPath}`);
     console.log(`Target: ${target}`);
-    if (opts.typesFile) {
-      console.log(`Types:  ${path.resolve(process.cwd(), opts.typesFile)}`);
+    if (loadedTypesFiles.length > 0) {
+      console.log(`Types:  ${loadedTypesFiles.join(', ')}`);
       console.log(`        (${Object.keys(customTypes).join(', ')})`);
     }
     console.log('');
@@ -223,6 +236,67 @@ async function validate(opts: Options) {
   }
 }
 
+async function generateDocumentation(opts: Options) {
+  const specPath = path.resolve(process.cwd(), opts.specFile!);
+
+  // Check spec file exists
+  if (!fs.existsSync(specPath)) {
+    console.error(`Error: Spec file not found: ${specPath}`);
+    process.exit(1);
+  }
+
+  // Load custom types if specified
+  const customTypes: Record<string, unknown> = {};
+  for (const typesFile of opts.typesFiles) {
+    const typesPath = path.resolve(process.cwd(), typesFile);
+    if (!fs.existsSync(typesPath)) {
+      console.error(`Error: Types file not found: ${typesPath}`);
+      process.exit(1);
+    }
+
+    try {
+      const typesUrl = pathToFileURL(typesPath).href;
+      const module = await import(typesUrl);
+      for (const [key, value] of Object.entries(module)) {
+        if (key !== 'default' && typeof value === 'function') {
+          customTypes[key] = value;
+        } else if (key !== 'default' && typeof value === 'object' && value !== null) {
+          customTypes[key] = value;
+        }
+      }
+    } catch (err) {
+      console.error(`Error loading types file ${typesPath}: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  }
+
+  // Create engine and parse spec to get root type
+  const engine = new SpecEngine();
+  if (Object.keys(customTypes).length > 0) {
+    engine.register(customTypes);
+  }
+
+  // Parse spec file to get root type (use engine's internal method)
+  const root = engine.parseSpec(specPath);
+  if (!root) {
+    console.error('Error: Failed to parse spec file or no root type defined');
+    process.exit(1);
+  }
+
+  // Generate documentation
+  const format = opts.docFormat ?? 'markdown';
+  const doc = generateDoc(root as Type | Modifier, format);
+
+  // Output
+  if (opts.output) {
+    const outPath = path.resolve(process.cwd(), opts.output);
+    fs.writeFileSync(outPath, doc);
+    console.log(`Documentation written to: ${outPath}`);
+  } else {
+    console.log(doc);
+  }
+}
+
 // Main
 async function main() {
   if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
@@ -242,8 +316,21 @@ async function main() {
 
   const opts = parseArgs(args);
 
-  if (!opts.specFile || !opts.targetPath) {
-    console.error('Error: Missing spec file or target path');
+  if (!opts.specFile) {
+    console.error('Error: Missing spec file');
+    console.log(help);
+    process.exit(1);
+  }
+
+  // Documentation mode
+  if (opts.doc) {
+    await generateDocumentation(opts);
+    process.exit(0);
+  }
+
+  // Validation mode
+  if (!opts.targetPath) {
+    console.error('Error: Missing target path (or use --doc for documentation)');
     console.log(help);
     process.exit(1);
   }
