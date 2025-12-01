@@ -2,6 +2,25 @@
 
 A universal **Spec DSL Engine** for describing and validating software specifications using code-as-spec approach.
 
+## Installation
+
+```bash
+npm install @specspec/core
+```
+
+## CLI Usage
+
+```bash
+# Create a sample spec file
+specspec --init
+
+# Validate a target against a spec
+specspec my.spec.js ./my-project
+
+# Show help
+specspec --help
+```
+
 ---
 
 ## Design Philosophy
@@ -109,6 +128,14 @@ Directory({
 ```
 
 ### 2. Run Validation
+
+**Using CLI:**
+
+```bash
+specspec my-package.spec.js ./my-project
+```
+
+**Using API:**
 
 ```javascript
 import { SpecEngine } from '@specspec/core';
