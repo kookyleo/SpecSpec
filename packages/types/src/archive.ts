@@ -112,7 +112,9 @@ export class ZipFileType extends Type<ZipFileSpec | undefined, string> {
     }
     return {
       name: 'ZipFile',
+      fsType: 'zipFile',
       summary: 'ZIP Archive',
+      fileExt: this.spec?.ext,
       constraints,
     };
   }

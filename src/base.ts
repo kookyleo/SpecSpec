@@ -4,7 +4,7 @@
 import type { Context, Issue } from './context.js';
 
 /**
- * Type description for documentation generation
+ * Type description for documentation and code generation
  */
 export interface TypeDescription {
   /** Type name (e.g., "String", "Number", "Field") */
@@ -28,6 +28,19 @@ export interface TypeDescription {
   itemType?: TypeDescription | undefined;
   /** Raw spec for custom rendering */
   spec?: unknown;
+
+  // === File system types ===
+
+  /** File system type category */
+  fsType?: 'bundle' | 'directory' | 'file' | 'jsonFile' | 'zipFile' | undefined;
+  /** Accepted carrier types for Bundle */
+  accept?: TypeDescription[] | undefined;
+  /** File path (relative) for File/JsonFile */
+  filePath?: string | undefined;
+  /** Required file extension */
+  fileExt?: string | undefined;
+  /** Name pattern (regex source) for Bundle */
+  namePattern?: string | undefined;
 }
 
 /**

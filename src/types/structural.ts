@@ -191,7 +191,10 @@ export class FileType extends Type<FileSpec | undefined, string> {
     }
     const desc: TypeDescription = {
       name: 'File',
+      fsType: 'file',
       key: this.spec?.path,
+      filePath: this.spec?.path,
+      fileExt: this.spec?.ext,
       constraints: constraints.length > 0 ? constraints : undefined,
     };
     if (this.spec?.content) {
@@ -280,7 +283,9 @@ export class DirectoryType extends Type<DirectorySpec | undefined, string> {
   describe(): TypeDescription {
     const desc: TypeDescription = {
       name: 'Directory',
+      fsType: 'directory',
       key: this.spec?.path,
+      filePath: this.spec?.path,
     };
     if (this.spec?.content) {
       if (isObjectSpec(this.spec.content)) {
@@ -360,7 +365,9 @@ export class JsonFileType extends Type<JsonFileSpec, string> {
   describe(): TypeDescription {
     return {
       name: 'JsonFile',
+      fsType: 'jsonFile',
       key: this.spec.path,
+      filePath: this.spec.path,
       children: {
         required: this.spec.required?.map(describeValidatable),
         optional: this.spec.optional?.map(describeValidatable),
