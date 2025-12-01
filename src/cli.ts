@@ -4,6 +4,7 @@
 
 import path from 'node:path';
 import fs from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import { SpecEngine } from './engine.js';
 
 const args = process.argv.slice(2);
@@ -13,18 +14,36 @@ const help = `
 SpecSpec - Validate targets against spec files
 
 Usage:
-  specspec <spec-file> <target-path>
+  specspec <spec-file> <target-path> [options]
   specspec --init [name]
 
+Options:
+  -t, --types <file>   Load custom types from a JS/MJS module
+  --json               Output results as JSON
+  --help, -h           Show this help message
+  --version, -v        Show version
+
 Commands:
-  --init [name]    Create a sample spec file (default: spec.js)
-  --help, -h       Show this help message
-  --version, -v    Show version
+  --init [name]        Create a sample spec file (default: spec.js)
 
 Examples:
   specspec package.spec.js ./my-project
+  specspec Spec.js ./bundle -t ./types.mjs
   specspec --init
   specspec --init my-package.spec.js
+
+Custom Types Module:
+  Export your types as named exports:
+
+    // my-types.mjs
+    import { Type } from '@specspec/core';
+
+    export class UrlType extends Type {
+      validate(value, ctx) { /* ... */ }
+    }
+    export const Url = (spec) => new UrlType(spec);
+
+  Then use with: specspec spec.js target -t ./my-types.mjs
 `;
 
 // Version
@@ -78,28 +97,115 @@ function init(name: string = 'spec.js') {
   console.log(`  specspec ${name} <target-path>`);
 }
 
-function validate(specFile: string, targetPath: string) {
-  const specPath = path.resolve(process.cwd(), specFile);
-  const target = path.resolve(process.cwd(), targetPath);
+// Parse options
+interface Options {
+  specFile?: string;
+  targetPath?: string;
+  typesFile?: string;
+  json?: boolean;
+}
+
+function parseArgs(args: string[]): Options {
+  const opts: Options = {};
+  const positional: string[] = [];
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]!;
+    if (arg === '-t' || arg === '--types') {
+      const nextArg = args[++i];
+      if (nextArg) opts.typesFile = nextArg;
+    } else if (arg === '--json') {
+      opts.json = true;
+    } else if (!arg.startsWith('-')) {
+      positional.push(arg);
+    }
+  }
+
+  if (positional[0]) opts.specFile = positional[0];
+  if (positional[1]) opts.targetPath = positional[1];
+  return opts;
+}
+
+async function validate(opts: Options) {
+  const specPath = path.resolve(process.cwd(), opts.specFile!);
+  const target = path.resolve(process.cwd(), opts.targetPath!);
 
   // Check spec file exists
   if (!fs.existsSync(specPath)) {
-    console.error(`Error: Spec file not found: ${specPath}`);
+    if (opts.json) {
+      console.log(JSON.stringify({ ok: false, issues: [{ level: 'error', code: 'spec.not_found', message: `Spec file not found: ${specPath}`, path: [] }] }));
+    } else {
+      console.error(`Error: Spec file not found: ${specPath}`);
+    }
     process.exit(1);
   }
 
   // Check target exists
   if (!fs.existsSync(target)) {
-    console.error(`Error: Target not found: ${target}`);
+    if (opts.json) {
+      console.log(JSON.stringify({ ok: false, issues: [{ level: 'error', code: 'target.not_found', message: `Target not found: ${target}`, path: [] }] }));
+    } else {
+      console.error(`Error: Target not found: ${target}`);
+    }
     process.exit(1);
   }
 
-  console.log(`Spec:   ${specPath}`);
-  console.log(`Target: ${target}`);
-  console.log('');
+  // Load custom types if specified
+  const customTypes: Record<string, unknown> = {};
+  if (opts.typesFile) {
+    const typesPath = path.resolve(process.cwd(), opts.typesFile);
+    if (!fs.existsSync(typesPath)) {
+      if (opts.json) {
+        console.log(JSON.stringify({ ok: false, issues: [{ level: 'error', code: 'types.not_found', message: `Types file not found: ${typesPath}`, path: [] }] }));
+      } else {
+        console.error(`Error: Types file not found: ${typesPath}`);
+      }
+      process.exit(1);
+    }
+
+    try {
+      // Use file:// URL for dynamic import on all platforms
+      const typesUrl = pathToFileURL(typesPath).href;
+      const module = await import(typesUrl);
+      // Filter out non-type exports (like Type class itself)
+      for (const [key, value] of Object.entries(module)) {
+        if (key !== 'default' && typeof value === 'function') {
+          customTypes[key] = value;
+        } else if (key !== 'default' && typeof value === 'object' && value !== null) {
+          // Instance types like SemVersion
+          customTypes[key] = value;
+        }
+      }
+    } catch (err) {
+      if (opts.json) {
+        console.log(JSON.stringify({ ok: false, issues: [{ level: 'error', code: 'types.load_error', message: `Failed to load types: ${(err as Error).message}`, path: [] }] }));
+      } else {
+        console.error(`Error loading types file: ${(err as Error).message}`);
+      }
+      process.exit(1);
+    }
+  }
+
+  if (!opts.json) {
+    console.log(`Spec:   ${specPath}`);
+    console.log(`Target: ${target}`);
+    if (opts.typesFile) {
+      console.log(`Types:  ${path.resolve(process.cwd(), opts.typesFile)}`);
+      console.log(`        (${Object.keys(customTypes).join(', ')})`);
+    }
+    console.log('');
+  }
 
   const engine = new SpecEngine();
+  if (Object.keys(customTypes).length > 0) {
+    engine.register(customTypes);
+  }
   const result = engine.run(specPath, target);
+
+  if (opts.json) {
+    console.log(JSON.stringify(result, null, 2));
+    process.exit(result.ok ? 0 : 1);
+  }
 
   if (result.ok) {
     console.log('\x1b[32m✓ Validation passed\x1b[0m');
@@ -117,26 +223,35 @@ function validate(specFile: string, targetPath: string) {
   }
 }
 
-// Parse arguments
-if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
-  console.log(help);
-  process.exit(0);
+// Main
+async function main() {
+  if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
+    console.log(help);
+    process.exit(0);
+  }
+
+  if (args.includes('--version') || args.includes('-v')) {
+    showVersion();
+    process.exit(0);
+  }
+
+  if (args[0] === '--init') {
+    init(args[1]);
+    process.exit(0);
+  }
+
+  const opts = parseArgs(args);
+
+  if (!opts.specFile || !opts.targetPath) {
+    console.error('Error: Missing spec file or target path');
+    console.log(help);
+    process.exit(1);
+  }
+
+  await validate(opts);
 }
 
-if (args.includes('--version') || args.includes('-v')) {
-  showVersion();
-  process.exit(0);
-}
-
-if (args[0] === '--init') {
-  init(args[1]);
-  process.exit(0);
-}
-
-if (args.length < 2) {
-  console.error('Error: Missing arguments');
-  console.log(help);
+main().catch(err => {
+  console.error(`Error: ${err.message}`);
   process.exit(1);
-}
-
-validate(args[0]!, args[1]!);
+});

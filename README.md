@@ -17,6 +17,12 @@ specspec --init
 # Validate a target against a spec
 specspec my.spec.js ./my-project
 
+# Load custom business types
+specspec Spec.js ./target -t ./my-types.mjs
+
+# Output as JSON (for CI/scripts)
+specspec my.spec.js ./target --json
+
 # Show help
 specspec --help
 ```
