@@ -18,7 +18,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp src/codegen/prelude.py dist/codegen/",
     "build:all": "npm run build && npm run build -w @specspec/types",
     "test": "npm run build && vitest run",
     "test:watch": "vitest",

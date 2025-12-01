@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { SpecEngine } from './engine.js';
 import { generateDoc } from './doc.js';
+import { generatePython } from './codegen/index.js';
 import { Type, Modifier } from './base.js';
 
 const args = process.argv.slice(2);
@@ -18,12 +19,14 @@ SpecSpec - Validate targets against spec files
 Usage:
   specspec <spec-file> <target-path> [options]
   specspec <spec-file> --doc [options]
+  specspec <spec-file> --codegen <lang> [options]
   specspec --init [name]
 
 Options:
   -t, --types <file>   Load custom types (can be used multiple times)
   --json               Output results as JSON
   --doc                Generate Markdown documentation from spec file
+  --codegen <lang>     Generate validator code (supported: python)
   -o, --output <file>  Write output to file instead of stdout
   --help, -h           Show this help message
   --version, -v        Show version
@@ -35,6 +38,7 @@ Examples:
   specspec package.spec.js ./my-project
   specspec Spec.js ./bundle -t ./core.mjs -t ./oauth.mjs
   specspec Spec.js --doc -o README.md
+  specspec Spec.js --codegen python -o validator.py
   specspec --init
 
 Custom Types:
@@ -100,6 +104,7 @@ interface Options {
   typesFiles: string[];
   json?: boolean;
   doc?: boolean;
+  codegen?: string;
   output?: string;
 }
 
@@ -116,6 +121,9 @@ function parseArgs(args: string[]): Options {
       opts.json = true;
     } else if (arg === '--doc') {
       opts.doc = true;
+    } else if (arg === '--codegen') {
+      const nextArg = args[++i];
+      if (nextArg) opts.codegen = nextArg;
     } else if (arg === '-o' || arg === '--output') {
       const nextArg = args[++i];
       if (nextArg) opts.output = nextArg;
@@ -289,6 +297,83 @@ async function generateDocumentation(opts: Options) {
   }
 }
 
+async function generateCode(opts: Options) {
+  const specPath = path.resolve(process.cwd(), opts.specFile!);
+  const lang = opts.codegen!;
+
+  // Check spec file exists
+  if (!fs.existsSync(specPath)) {
+    console.error(`Error: Spec file not found: ${specPath}`);
+    process.exit(1);
+  }
+
+  // Check supported language
+  const supportedLangs = ['python'];
+  if (!supportedLangs.includes(lang)) {
+    console.error(`Error: Unsupported language: ${lang}`);
+    console.error(`Supported languages: ${supportedLangs.join(', ')}`);
+    process.exit(1);
+  }
+
+  // Load custom types if specified
+  const customTypes: Record<string, unknown> = {};
+  for (const typesFile of opts.typesFiles) {
+    const typesPath = path.resolve(process.cwd(), typesFile);
+    if (!fs.existsSync(typesPath)) {
+      console.error(`Error: Types file not found: ${typesPath}`);
+      process.exit(1);
+    }
+
+    try {
+      const typesUrl = pathToFileURL(typesPath).href;
+      const module = await import(typesUrl);
+      for (const [key, value] of Object.entries(module)) {
+        if (key !== 'default' && typeof value === 'function') {
+          customTypes[key] = value;
+        } else if (key !== 'default' && typeof value === 'object' && value !== null) {
+          customTypes[key] = value;
+        }
+      }
+    } catch (err) {
+      console.error(`Error loading types file ${typesPath}: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  }
+
+  // Create engine and parse spec to get root type
+  const engine = new SpecEngine();
+  if (Object.keys(customTypes).length > 0) {
+    engine.register(customTypes);
+  }
+
+  const root = engine.parseSpec(specPath);
+  if (!root) {
+    console.error('Error: Failed to parse spec file or no root type defined');
+    process.exit(1);
+  }
+
+  // Get type description
+  const desc = (root as Type | Modifier).describe();
+
+  // Generate code
+  let code: string;
+  if (lang === 'python') {
+    code = generatePython(desc);
+  } else {
+    console.error(`Error: Code generation not implemented for: ${lang}`);
+    process.exit(1);
+  }
+
+  // Output
+  if (opts.output) {
+    const outPath = path.resolve(process.cwd(), opts.output);
+    fs.writeFileSync(outPath, code);
+    console.log(`Generated ${lang} validator: ${outPath}`);
+  } else {
+    console.log(code);
+  }
+}
+
 // Main
 async function main() {
   if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
@@ -320,9 +405,15 @@ async function main() {
     process.exit(0);
   }
 
+  // Code generation mode
+  if (opts.codegen) {
+    await generateCode(opts);
+    process.exit(0);
+  }
+
   // Validation mode
   if (!opts.targetPath) {
-    console.error('Error: Missing target path (or use --doc for documentation)');
+    console.error('Error: Missing target path (or use --doc/--codegen)');
     console.log(help);
     process.exit(1);
   }
