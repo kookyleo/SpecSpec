@@ -23,6 +23,15 @@ specspec Spec.js ./target -t ./my-types.mjs
 # Output as JSON (for CI/scripts)
 specspec my.spec.js ./target --json
 
+# Generate documentation from spec
+specspec Spec.js --doc -o README.md
+
+# Generate validator code (Python, TypeScript, Swift, Rust)
+specspec Spec.js --codegen python -o validator.py
+specspec Spec.js --codegen typescript -o validator.ts
+specspec Spec.js --codegen swift -o Validator.swift
+specspec Spec.js --codegen rust -o validator.rs
+
 # Show help
 specspec --help
 ```
@@ -186,19 +195,46 @@ engine.register({ Email });
 
 ---
 
+## Code Generation
+
+Generate standalone validators from spec files in multiple languages:
+
+| Language | Command | Dependencies |
+|----------|---------|--------------|
+| Python | `--codegen python` | None (stdlib only) |
+| TypeScript | `--codegen typescript` | `adm-zip` |
+| Swift | `--codegen swift` | Foundation |
+| Rust | `--codegen rust` | `serde_json`, `regex`, `zip` |
+
+Generated validators include:
+- All validation primitives (string, number, boolean, object, array)
+- File system validation (directory, file, JSON file)
+- Bundle validation (directory or zip archive)
+- CLI entry point for standalone execution
+
+---
+
 ## Architecture
 
 ```
 @specspec/core
-├── base.ts        # Type, Modifier base classes
-├── context.ts     # ValidationContext
-├── engine.ts      # SpecEngine (VM sandbox)
+├── base.ts           # Type, Modifier base classes
+├── context.ts        # ValidationContext
+├── engine.ts         # SpecEngine (VM sandbox)
+├── doc.ts            # Documentation generator
 ├── types/
-│   ├── primitives.ts   # Str, Bool, Num
-│   └── structural.ts   # Field, File, Directory, JsonFile
-└── modifiers/
-    ├── oneof.ts   # OneOf
-    └── listof.ts  # ListOf
+│   ├── primitives.ts # Str, Bool, Num
+│   └── structural.ts # Field, File, Directory, JsonFile
+├── modifiers/
+│   ├── oneof.ts      # OneOf
+│   └── listof.ts     # ListOf
+└── codegen/
+    ├── base.ts       # CodeGenerator abstract class
+    ├── index.ts      # Language registry
+    ├── python/       # Python generator + prelude
+    ├── typescript/   # TypeScript generator + prelude
+    ├── swift/        # Swift generator + prelude
+    └── rust/         # Rust generator + prelude
 ```
 
 ---
