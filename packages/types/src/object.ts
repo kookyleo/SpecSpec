@@ -125,15 +125,23 @@ export class ObjectTypeClass extends Type<ObjectSpec, unknown> {
   }
 
   describe(): TypeDescription {
-    const desc: TypeDescription = {
-      name: 'Object',
-    };
-
     const { required, optional, discriminator } = this.spec ?? {};
 
+    // Build summary with discriminator info
+    let summary: string | undefined;
     if (discriminator) {
-      desc.summary = `Object (${discriminator.key}=${JSON.stringify(discriminator.value)})`;
+      if (discriminator.value === EXISTS || discriminator.value === Symbol.for('specspec.exists')) {
+        summary = `${discriminator.key} 存在`;
+      } else {
+        const valStr = JSON.stringify(discriminator.value);
+        summary = `${discriminator.key}=${valStr}`;
+      }
     }
+
+    const desc: TypeDescription = {
+      name: 'Object',
+      summary,
+    };
 
     if ((required && required.length > 0) || (optional && optional.length > 0)) {
       desc.children = {};
@@ -152,9 +160,10 @@ export class ObjectTypeClass extends Type<ObjectSpec, unknown> {
         desc.children.optional = optional.map(f => {
           const resolved = resolveType(f);
           if (resolved && typeof resolved === 'object' && 'describe' in resolved) {
-            return (resolved as Type).describe();
+            const childDesc = (resolved as Type).describe();
+            return { ...childDesc, optional: true };
           }
-          return { name: 'Unknown', spec: f };
+          return { name: 'Unknown', spec: f, optional: true };
         });
       }
     }
