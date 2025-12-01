@@ -9,54 +9,6 @@ import type { TypeDescription } from '../base.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
- * Code generation context
- */
-interface CodegenContext {
-  /** Generated function names */
-  functions: Map<string, string>;
-  /** Function counter for unique names */
-  counter: number;
-  /** Output lines */
-  lines: string[];
-  /** Indentation level */
-  indent: number;
-}
-
-/**
- * Create a new codegen context
- */
-function createContext(): CodegenContext {
-  return {
-    functions: new Map(),
-    counter: 0,
-    lines: [],
-    indent: 0,
-  };
-}
-
-/**
- * Add a line with current indentation
- */
-function emit(ctx: CodegenContext, line: string): void {
-  ctx.lines.push('    '.repeat(ctx.indent) + line);
-}
-
-/**
- * Add an empty line
- */
-function emitBlank(ctx: CodegenContext): void {
-  ctx.lines.push('');
-}
-
-/**
- * Generate a unique function name
- */
-function genFuncName(ctx: CodegenContext, prefix: string): string {
-  ctx.counter++;
-  return `${prefix}_${ctx.counter}`;
-}
-
-/**
  * Escape string for Python
  */
 function pyStr(s: string): string {
@@ -74,34 +26,22 @@ function parseConstraint(constraint: string, prefix: string): string | null {
 }
 
 /**
- * Generate validator for a type description
- * Returns the function name
+ * Generate inline lambda expression for a type description
+ * Returns a Python expression string that can be used as a validator
  */
-function generateValidator(desc: TypeDescription, ctx: CodegenContext): string {
+function generateValidatorExpr(desc: TypeDescription): string {
   const name = desc.name;
 
   // Literal value
   if (name === 'Literal') {
-    const val = desc.constraints?.[0]?.replace('equals ', '') ?? 'null';
-    const funcName = genFuncName(ctx, 'validate_literal');
-    emitBlank(ctx);
-    emit(ctx, `def ${funcName}(value, path, issues):`);
-    ctx.indent++;
-    emit(ctx, `validate_literal(value, path, issues, ${val})`);
-    ctx.indent--;
-    return funcName;
+    const val = desc.constraints?.[0]?.replace('equals ', '') ?? 'None';
+    return `lambda v, p, i: validate_literal(v, p, i, ${val})`;
   }
 
   // Pattern
   if (name === 'Pattern') {
     const pattern = desc.constraints?.[0]?.replace('matches ', '').replace(/^`|`$/g, '') ?? '';
-    const funcName = genFuncName(ctx, 'validate_pattern');
-    emitBlank(ctx);
-    emit(ctx, `def ${funcName}(value, path, issues):`);
-    ctx.indent++;
-    emit(ctx, `validate_pattern(value, path, issues, ${pyStr(pattern)})`);
-    ctx.indent--;
-    return funcName;
+    return `lambda v, p, i: validate_pattern(v, p, i, ${pyStr(pattern)})`;
   }
 
   // String
@@ -114,21 +54,14 @@ function generateValidator(desc: TypeDescription, ctx: CodegenContext): string {
       } else if ((val = parseConstraint(c, 'maximum ')) && c.includes('character')) {
         args.push(`max_length=${val.split(' ')[0]}`);
       } else if ((val = parseConstraint(c, 'matches '))) {
-        // Remove backticks if present
         const pattern = val.replace(/^`|`$/g, '');
         args.push(`pattern=${pyStr(pattern)}`);
       }
     }
     if (args.length === 0) {
-      return 'validate_str';  // Use prelude function directly
+      return 'validate_str';
     }
-    const funcName = genFuncName(ctx, 'validate_str');
-    emitBlank(ctx);
-    emit(ctx, `def ${funcName}(value, path, issues):`);
-    ctx.indent++;
-    emit(ctx, `validate_str(value, path, issues, ${args.join(', ')})`);
-    ctx.indent--;
-    return funcName;
+    return `lambda v, p, i: validate_str(v, p, i, ${args.join(', ')})`;
   }
 
   // Number
@@ -147,13 +80,7 @@ function generateValidator(desc: TypeDescription, ctx: CodegenContext): string {
     if (args.length === 0) {
       return 'validate_num';
     }
-    const funcName = genFuncName(ctx, 'validate_num');
-    emitBlank(ctx);
-    emit(ctx, `def ${funcName}(value, path, issues):`);
-    ctx.indent++;
-    emit(ctx, `validate_num(value, path, issues, ${args.join(', ')})`);
-    ctx.indent--;
-    return funcName;
+    return `lambda v, p, i: validate_num(v, p, i, ${args.join(', ')})`;
   }
 
   // Boolean
@@ -163,26 +90,14 @@ function generateValidator(desc: TypeDescription, ctx: CodegenContext): string {
 
   // OneOf
   if (name === 'OneOf' && desc.oneOf) {
-    const optionFuncs = desc.oneOf.map(opt => generateValidator(opt, ctx));
-    const funcName = genFuncName(ctx, 'validate_oneof');
-    emitBlank(ctx);
-    emit(ctx, `def ${funcName}(value, path, issues):`);
-    ctx.indent++;
-    emit(ctx, `validate_oneof(value, path, issues, [`);
-    ctx.indent++;
-    for (const fn of optionFuncs) {
-      emit(ctx, `${fn},`);
-    }
-    ctx.indent--;
-    emit(ctx, `])`);
-    ctx.indent--;
-    return funcName;
+    const options = desc.oneOf.map(opt => generateValidatorExpr(opt));
+    return `lambda v, p, i: validate_oneof(v, p, i, [${options.join(', ')}])`;
   }
 
   // ListOf
   if (name === 'ListOf' && desc.itemType) {
-    const itemFunc = generateValidator(desc.itemType, ctx);
-    const args: string[] = [`item_validator=${itemFunc}`];
+    const itemExpr = generateValidatorExpr(desc.itemType);
+    const args: string[] = [`item_validator=${itemExpr}`];
     for (const c of desc.constraints ?? []) {
       let val: string | null;
       if ((val = parseConstraint(c, 'minimum ')) && c.includes('items')) {
@@ -191,111 +106,68 @@ function generateValidator(desc: TypeDescription, ctx: CodegenContext): string {
         args.push(`max_items=${val.split(' ')[0]}`);
       }
     }
-    const funcName = genFuncName(ctx, 'validate_list');
-    emitBlank(ctx);
-    emit(ctx, `def ${funcName}(value, path, issues):`);
-    ctx.indent++;
-    emit(ctx, `validate_list(value, path, issues, ${args.join(', ')})`);
-    ctx.indent--;
-    return funcName;
+    return `lambda v, p, i: validate_list(v, p, i, ${args.join(', ')})`;
   }
 
-  // Field
+  // Field - generates a field validator call
   if (name === 'Field' && desc.key) {
     const key = desc.key;
     const optional = desc.optional ?? false;
+    const args: string[] = [pyStr(key)];
 
     // Determine value validator
-    let valueFunc: string | null = null;
+    let valueExpr: string | null = null;
     if (desc.oneOf) {
-      // Field with OneOf value
-      const optionFuncs = desc.oneOf.map(opt => generateValidator(opt, ctx));
-      valueFunc = genFuncName(ctx, 'validate_field_value');
-      emitBlank(ctx);
-      emit(ctx, `def ${valueFunc}(value, path, issues):`);
-      ctx.indent++;
-      emit(ctx, `validate_oneof(value, path, issues, [`);
-      ctx.indent++;
-      for (const fn of optionFuncs) {
-        emit(ctx, `${fn},`);
-      }
-      ctx.indent--;
-      emit(ctx, `])`);
-      ctx.indent--;
+      const options = desc.oneOf.map(opt => generateValidatorExpr(opt));
+      valueExpr = `lambda v, p, i: validate_oneof(v, p, i, [${options.join(', ')}])`;
     } else if (desc.itemType) {
-      // Field with ListOf value
-      valueFunc = generateValidator({ name: 'ListOf', itemType: desc.itemType, constraints: desc.constraints }, ctx);
+      valueExpr = generateValidatorExpr({ name: 'ListOf', itemType: desc.itemType, constraints: desc.constraints });
     } else if (desc.children) {
-      // Field with nested object
-      valueFunc = generateObjectValidator(desc.children, ctx);
+      valueExpr = generateObjectExpr(desc.children);
     } else if (desc.summary) {
-      // Simple type referenced by summary
-      valueFunc = generateValidator({ name: desc.summary, constraints: desc.constraints }, ctx);
+      valueExpr = generateValidatorExpr({ name: desc.summary, constraints: desc.constraints });
     }
 
-    const funcName = genFuncName(ctx, 'validate_field');
-    emitBlank(ctx);
-    emit(ctx, `def ${funcName}(obj, path, issues):`);
-    ctx.indent++;
-    const args = [`obj, path, issues, ${pyStr(key)}`];
-    if (valueFunc) {
-      args.push(`validator=${valueFunc}`);
+    if (valueExpr) {
+      args.push(`validator=${valueExpr}`);
     }
     if (optional) {
       args.push('optional=True');
     }
-    emit(ctx, `validate_field(${args.join(', ')})`);
-    ctx.indent--;
-    return funcName;
+    return `lambda v, p, i: validate_field(v, p, i, ${args.join(', ')})`;
   }
 
   // Object with children
   if ((name === 'Object' || name === 'JsonFile' || name === 'Directory' || name === 'Bundle') && desc.children) {
-    return generateObjectValidator(desc.children, ctx);
+    return generateObjectExpr(desc.children);
   }
 
-  // Unknown/custom type - generate placeholder
-  const funcName = genFuncName(ctx, 'validate_unknown');
-  emitBlank(ctx);
-  emit(ctx, `def ${funcName}(value, path, issues):`);
-  ctx.indent++;
-  emit(ctx, `# TODO: Custom type '${name}' - implement validation`);
-  emit(ctx, `pass`);
-  ctx.indent--;
-  return funcName;
+  // Unknown/custom type - generate placeholder that passes
+  return `(lambda v, p, i: None)`;
 }
 
 /**
- * Generate validator for object children
+ * Generate object validator expression
  */
-function generateObjectValidator(
-  children: { required?: TypeDescription[] | undefined; optional?: TypeDescription[] | undefined },
-  ctx: CodegenContext
+function generateObjectExpr(
+  children: { required?: TypeDescription[] | undefined; optional?: TypeDescription[] | undefined }
 ): string {
-  const requiredFuncs = (children.required ?? []).map(child => generateValidator(child, ctx));
-  const optionalFuncs = (children.optional ?? []).map(child => {
-    // Mark as optional for field generation
-    return generateValidator({ ...child, optional: true }, ctx);
-  });
+  const fieldExprs: string[] = [];
 
-  const funcName = genFuncName(ctx, 'validate_object');
-  emitBlank(ctx);
-  emit(ctx, `def ${funcName}(value, path, issues):`);
-  ctx.indent++;
-  emit(ctx, `if not validate_object(value, path, issues):`);
-  ctx.indent++;
-  emit(ctx, `return`);
-  ctx.indent--;
-
-  for (const fn of requiredFuncs) {
-    emit(ctx, `${fn}(value, path, issues)`);
+  for (const child of children.required ?? []) {
+    fieldExprs.push(generateValidatorExpr(child));
   }
-  for (const fn of optionalFuncs) {
-    emit(ctx, `${fn}(value, path, issues)`);
+  for (const child of children.optional ?? []) {
+    fieldExprs.push(generateValidatorExpr({ ...child, optional: true }));
   }
 
-  ctx.indent--;
-  return funcName;
+  if (fieldExprs.length === 0) {
+    return 'validate_object';
+  }
+
+  // Generate a lambda that validates object and all fields
+  const fieldCalls = fieldExprs.map(expr => `(${expr})(v, p, i)`).join(', ');
+  return `lambda v, p, i: validate_object(v, p, i) and [${fieldCalls}]`;
 }
 
 /**
@@ -306,27 +178,23 @@ export function generatePython(desc: TypeDescription): string {
   const preludePath = path.join(__dirname, 'prelude.py');
   const prelude = fs.readFileSync(preludePath, 'utf-8');
 
-  const ctx = createContext();
-
-  // Generate validators
-  const rootFunc = generateValidator(desc, ctx);
+  // Generate root validator expression
+  const rootExpr = generateValidatorExpr(desc);
 
   // Build output
   const lines: string[] = [
     prelude,
     '',
     '# ' + '='.repeat(60),
-    '# Generated Validators',
+    '# Generated Schema',
     '# ' + '='.repeat(60),
-    ...ctx.lines,
     '',
-    '# ' + '='.repeat(60),
-    '# Root validator',
-    '# ' + '='.repeat(60),
+    `_root_validator = ${rootExpr}`,
+    '',
     '',
     'def validate_root(value):',
     '    """Validate value against the generated schema."""',
-    `    return validate(value, ${rootFunc})`,
+    '    return validate(value, _root_validator)',
     '',
     '',
     'if __name__ == "__main__":',
