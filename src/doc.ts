@@ -171,24 +171,9 @@ function formatInlineType(desc: TypeDescription): string {
 }
 
 /**
- * Generate JSON schema-like documentation
- */
-export function generateJson(desc: TypeDescription): object {
-  return desc;
-}
-
-/**
  * Generate documentation from a root type
  */
-export function generateDoc(
-  root: Type | Modifier,
-  format: 'markdown' | 'json' = 'markdown'
-): string {
+export function generateDoc(root: Type | Modifier): string {
   const desc = root.describe();
-
-  if (format === 'json') {
-    return JSON.stringify(generateJson(desc), null, 2);
-  }
-
   return generateMarkdown(desc);
 }

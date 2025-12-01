@@ -28,4 +28,4 @@ export { ListOf, ListOfModifier, type ListOfSpec } from './modifiers/listof.js';
 export { SpecEngine, createEngine, type ValidationResult, type EngineOptions } from './engine.js';
 
 // Documentation generator
-export { generateDoc, generateMarkdown, generateJson } from './doc.js';
+export { generateDoc, generateMarkdown } from './doc.js';

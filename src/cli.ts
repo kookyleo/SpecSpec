@@ -23,8 +23,7 @@ Usage:
 Options:
   -t, --types <file>   Load custom types (can be used multiple times)
   --json               Output results as JSON
-  --doc                Generate documentation from spec file
-  --format <fmt>       Doc format: markdown (default) or json
+  --doc                Generate Markdown documentation from spec file
   -o, --output <file>  Write output to file instead of stdout
   --help, -h           Show this help message
   --version, -v        Show version
@@ -101,7 +100,6 @@ interface Options {
   typesFiles: string[];
   json?: boolean;
   doc?: boolean;
-  docFormat?: 'markdown' | 'json';
   output?: string;
 }
 
@@ -118,11 +116,6 @@ function parseArgs(args: string[]): Options {
       opts.json = true;
     } else if (arg === '--doc') {
       opts.doc = true;
-    } else if (arg === '--format') {
-      const nextArg = args[++i];
-      if (nextArg === 'json' || nextArg === 'markdown') {
-        opts.docFormat = nextArg;
-      }
     } else if (arg === '-o' || arg === '--output') {
       const nextArg = args[++i];
       if (nextArg) opts.output = nextArg;
@@ -284,8 +277,7 @@ async function generateDocumentation(opts: Options) {
   }
 
   // Generate documentation
-  const format = opts.docFormat ?? 'markdown';
-  const doc = generateDoc(root as Type | Modifier, format);
+  const doc = generateDoc(root as Type | Modifier);
 
   // Output
   if (opts.output) {
