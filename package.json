@@ -12,22 +12,18 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    },
-    "./types": {
-      "types": "./dist/types/index.d.ts",
-      "default": "./dist/types/index.js"
-    },
-    "./modifiers": {
-      "types": "./dist/modifiers/index.d.ts",
-      "default": "./dist/modifiers/index.js"
     }
   },
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "build": "tsc",
+    "build:all": "npm run build && npm run build -w @specspec/types",
     "test": "npm run build && vitest run",
     "test:watch": "vitest",
     "lint": "eslint src",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist packages/*/dist"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

@@ -1,0 +1,36 @@
+{
+  "name": "@specspec/types",
+  "version": "0.1.0",
+  "description": "Extended types for SpecSpec validation DSL",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint src",
+    "test": "npm run build && vitest run"
+  },
+  "keywords": ["specspec", "validation", "types", "dsl"],
+  "author": "kookyleo <kookyleo@gmail.com>",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kookyleo/specspec.git",
+    "directory": "packages/types"
+  },
+  "peerDependencies": {
+    "@specspec/core": ">=0.3.0"
+  },
+  "devDependencies": {
+    "@specspec/core": "file:../..",
+    "typescript": "^5.7.2",
+    "vitest": "^3.2.4"
+  }
+}
