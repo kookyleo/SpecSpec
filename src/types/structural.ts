@@ -34,6 +34,8 @@ function describeValidatable(v: Validatable | ObjectSpec): TypeDescription {
 // ═══════════════════════════════════════════════════════════════
 
 export interface FieldSpec {
+  /** Human-readable description */
+  description?: string;
   key: string;
   value?: Validatable | ObjectSpec;
   optional?: boolean;
@@ -74,10 +76,11 @@ export class FieldType extends Type<FieldSpec, Record<string, unknown>> {
   }
 
   describe(): TypeDescription {
-    const { key, value, optional } = this.spec;
+    const { description, key, value, optional } = this.spec;
     const desc: TypeDescription = {
       name: 'Field',
       key,
+      description,
       optional,
     };
 
@@ -102,6 +105,8 @@ export const Field = (spec: FieldSpec) => new FieldType(spec);
 // ═══════════════════════════════════════════════════════════════
 
 export interface FileSpec {
+  /** Human-readable description */
+  description?: string;
   path?: string;
   ext?: string;
   content?: Validatable | ObjectSpec;
@@ -193,6 +198,7 @@ export class FileType extends Type<FileSpec | undefined, string> {
       name: 'File',
       fsType: 'file',
       key: this.spec?.path,
+      description: this.spec?.description,
       filePath: this.spec?.path,
       fileExt: this.spec?.ext,
       constraints: constraints.length > 0 ? constraints : undefined,
@@ -216,6 +222,8 @@ export const File = Object.assign(
 // ═══════════════════════════════════════════════════════════════
 
 export interface DirectorySpec {
+  /** Human-readable description */
+  description?: string;
   path?: string;
   content?: Validatable | ObjectSpec;
 }
@@ -285,6 +293,7 @@ export class DirectoryType extends Type<DirectorySpec | undefined, string> {
       name: 'Directory',
       fsType: 'directory',
       key: this.spec?.path,
+      description: this.spec?.description,
       filePath: this.spec?.path,
     };
     if (this.spec?.content) {
@@ -313,6 +322,8 @@ export const Directory = Object.assign(
 // ═══════════════════════════════════════════════════════════════
 
 export interface JsonFileSpec {
+  /** Human-readable description */
+  description?: string;
   path: string;
   required?: Validatable[];
   optional?: Validatable[];
@@ -367,6 +378,7 @@ export class JsonFileType extends Type<JsonFileSpec, string> {
       name: 'JsonFile',
       fsType: 'jsonFile',
       key: this.spec.path,
+      description: this.spec.description,
       filePath: this.spec.path,
       children: {
         required: this.spec.required?.map(describeValidatable),

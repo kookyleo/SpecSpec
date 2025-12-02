@@ -9,6 +9,8 @@ import type { Context } from '../context.js';
 // ═══════════════════════════════════════════════════════════════
 
 export interface StrSpec {
+  /** Human-readable description */
+  description?: string;
   minLength?: number;
   maxLength?: number;
   match?: RegExp;
@@ -48,7 +50,11 @@ export class StrType extends Type<StrSpec | undefined, string> {
     if (this.spec?.match) {
       constraints.push(`matches \`${this.spec.match}\``);
     }
-    return { name: 'String', constraints: constraints.length > 0 ? constraints : undefined };
+    return {
+      name: 'String',
+      description: this.spec?.description,
+      constraints: constraints.length > 0 ? constraints : undefined,
+    };
   }
 }
 
@@ -64,6 +70,8 @@ export const Str = Object.assign(
 // ═══════════════════════════════════════════════════════════════
 
 export interface BoolSpec {
+  /** Human-readable description */
+  description?: string;
   default?: boolean;
 }
 
@@ -80,7 +88,11 @@ export class BoolType extends Type<BoolSpec | undefined, boolean> {
     if (this.spec?.default !== undefined) {
       constraints.push(`default: ${this.spec.default}`);
     }
-    return { name: 'Boolean', constraints: constraints.length > 0 ? constraints : undefined };
+    return {
+      name: 'Boolean',
+      description: this.spec?.description,
+      constraints: constraints.length > 0 ? constraints : undefined,
+    };
   }
 }
 
@@ -95,6 +107,8 @@ export const Bool = Object.assign(
 // ═══════════════════════════════════════════════════════════════
 
 export interface NumSpec {
+  /** Human-readable description */
+  description?: string;
   min?: number;
   max?: number;
   integer?: boolean;
@@ -134,7 +148,11 @@ export class NumType extends Type<NumSpec | undefined, number> {
     if (this.spec?.max !== undefined) {
       constraints.push(`maximum ${this.spec.max}`);
     }
-    return { name: 'Number', constraints: constraints.length > 0 ? constraints : undefined };
+    return {
+      name: 'Number',
+      description: this.spec?.description,
+      constraints: constraints.length > 0 ? constraints : undefined,
+    };
   }
 }
 

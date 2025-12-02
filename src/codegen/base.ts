@@ -185,11 +185,20 @@ export abstract class CodeGenerator {
       '',
       this.commentLine('='.repeat(60)),
       this.commentLine('Generated Schema'),
-      this.commentLine('='.repeat(60)),
-      '',
-      validatorDecl,
-      mainCode,
     ];
+
+    // Add root description as comment if available
+    if (desc.description) {
+      lines.push(this.commentLine(''));
+      for (const line of desc.description.split('\n')) {
+        lines.push(this.commentLine(line));
+      }
+    }
+
+    lines.push(this.commentLine('='.repeat(60)));
+    lines.push('');
+    lines.push(validatorDecl);
+    lines.push(mainCode);
 
     return lines.join('\n');
   }

@@ -11,7 +11,9 @@ export interface TypeDescription {
   name: string;
   /** Key/path for this item (e.g., field key, file path) */
   key?: string | undefined;
-  /** Short description */
+  /** Human-readable description for documentation and code comments */
+  description?: string | undefined;
+  /** Short type summary (auto-generated from type name) */
   summary?: string | undefined;
   /** List of constraints (e.g., ["minimum 1 character", "matches /^[a-z]+$/"]) */
   constraints?: string[] | undefined;

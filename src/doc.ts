@@ -79,10 +79,15 @@ function renderType(desc: TypeDescription, indent: number = 0, depth: number = 1
   // Simple type: render inline
   if (isSimpleType(desc)) {
     if (desc.key) {
-      lines.push(`${prefix}- **\`${displayName}\`**${optional}: ${formatInline(desc)}`);
+      const descText = desc.description ? ` — ${desc.description}` : '';
+      lines.push(`${prefix}- **\`${displayName}\`**${optional}: ${formatInline(desc)}${descText}`);
     } else if (useHeadings && depth === 1) {
       lines.push(`${'#'.repeat(depth)} ${displayName}`);
       lines.push('');
+      if (desc.description) {
+        lines.push(desc.description);
+        lines.push('');
+      }
       if (desc.summary || desc.constraints) {
         lines.push(`**类型:** ${formatInline(desc)}`);
         lines.push('');
@@ -115,18 +120,26 @@ function renderType(desc: TypeDescription, indent: number = 0, depth: number = 1
     if (useHeadings) {
       lines.push(`${'#'.repeat(Math.min(depth, 5))} \`${displayName}\`${optional}`);
       lines.push('');
+      if (desc.description) {
+        lines.push(desc.description);
+        lines.push('');
+      }
       if (typeLabel) {
         lines.push(`**类型:** ${typeLabel}`);
         lines.push('');
       }
     } else {
-      lines.push(`${prefix}- **\`${displayName}\`**${optional}${typeLabel ? ': ' + typeLabel : ''}`);
+      const descText = desc.description ? ` — ${desc.description}` : '';
+      lines.push(`${prefix}- **\`${displayName}\`**${optional}${typeLabel ? ': ' + typeLabel : ''}${descText}`);
     }
   } else if (useHeadings && depth === 1) {
     // Root type without key
     lines.push(`# ${displayName}`);
     lines.push('');
-    if (desc.summary) {
+    if (desc.description) {
+      lines.push(desc.description);
+      lines.push('');
+    } else if (desc.summary) {
       lines.push(`${desc.summary}`);
       lines.push('');
     }
