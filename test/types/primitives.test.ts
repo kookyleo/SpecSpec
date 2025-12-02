@@ -11,6 +11,11 @@ describe('Str', () => {
     expect(ctx.issues).toHaveLength(0);
   });
 
+  it('includes description in describe()', () => {
+    const desc = Str({ description: '用户名' }).describe();
+    expect(desc.description).toBe('用户名');
+  });
+
   it('rejects non-string', () => {
     const ctx = createTestContext();
     Str().validate(123, ctx);
@@ -53,6 +58,11 @@ describe('Bool', () => {
     expect(ctx.issues).toHaveLength(0);
   });
 
+  it('includes description in describe()', () => {
+    const desc = Bool({ description: '是否启用' }).describe();
+    expect(desc.description).toBe('是否启用');
+  });
+
   it('accepts false', () => {
     const ctx = createTestContext();
     Bool().validate(false, ctx);
@@ -72,6 +82,11 @@ describe('Num', () => {
     const ctx = createTestContext();
     Num().validate(42, ctx);
     expect(ctx.issues).toHaveLength(0);
+  });
+
+  it('includes description in describe()', () => {
+    const desc = Num({ description: '年龄', min: 0 }).describe();
+    expect(desc.description).toBe('年龄');
   });
 
   it('accepts zero', () => {

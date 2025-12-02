@@ -13,6 +13,12 @@ describe('Field', () => {
     expect(ctx.issues).toHaveLength(0);
   });
 
+  it('includes description in describe()', () => {
+    const desc = Field({ key: 'name', value: Str(), description: '用户姓名' }).describe();
+    expect(desc.description).toBe('用户姓名');
+    expect(desc.key).toBe('name');
+  });
+
   it('reports missing required field', () => {
     const ctx = createTestContext();
     const obj = { other: 'value' };
@@ -77,6 +83,16 @@ describe('Field', () => {
 });
 
 describe('JsonFile', () => {
+  it('includes description in describe()', () => {
+    const desc = JsonFile({
+      path: 'config.json',
+      description: '配置文件',
+      required: [Field({ key: 'name', value: Str() })],
+    }).describe();
+    expect(desc.description).toBe('配置文件');
+    expect(desc.filePath).toBe('config.json');
+  });
+
   it('validates JSON file with fields', () => {
     const ctx = createTestContext();
     // Create a temporary test file
