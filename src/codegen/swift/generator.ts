@@ -186,19 +186,20 @@ export class SwiftGenerator extends CodeGenerator {
 
   generateFSChildExpr(desc: TypeDescription): string {
     const fsType = desc.fsType;
+    const comment = desc.description ? `/* ${desc.description} */ ` : '';
 
     if (fsType === 'jsonFile' && desc.filePath) {
       const contentExpr = desc.children ? this.generateObjectExpr(desc.children) : 'nil';
-      return `_ = validateJsonFile(ctx, ${this.escapeString(desc.filePath)}, p, &i, contentValidator: ${contentExpr})`;
+      return `${comment}_ = validateJsonFile(ctx, ${this.escapeString(desc.filePath)}, p, &i, contentValidator: ${contentExpr})`;
     }
 
     if (fsType === 'file' && desc.filePath) {
       const ext = desc.fileExt ? `, ext: ${this.escapeString(desc.fileExt)}` : '';
-      return `_ = validateFsFile(ctx, ${this.escapeString(desc.filePath)}, p, &i${ext})`;
+      return `${comment}_ = validateFsFile(ctx, ${this.escapeString(desc.filePath)}, p, &i${ext})`;
     }
 
     if (fsType === 'directory' && desc.filePath) {
-      return `_ = validateFsDirectory(ctx, ${this.escapeString(desc.filePath)}, p, &i)`;
+      return `${comment}_ = validateFsDirectory(ctx, ${this.escapeString(desc.filePath)}, p, &i)`;
     }
 
     return '/* unknown fs type */';

@@ -185,19 +185,20 @@ export class TypeScriptGenerator extends CodeGenerator {
 
   generateFSChildExpr(desc: TypeDescription): string {
     const fsType = desc.fsType;
+    const comment = desc.description ? `/* ${desc.description} */ ` : '';
 
     if (fsType === 'jsonFile' && desc.filePath) {
       const contentExpr = desc.children ? this.generateObjectExpr(desc.children) : 'undefined';
-      return `validateJsonFile(ctx, ${this.escapeString(desc.filePath)}, p, i, ${contentExpr})`;
+      return `${comment}validateJsonFile(ctx, ${this.escapeString(desc.filePath)}, p, i, ${contentExpr})`;
     }
 
     if (fsType === 'file' && desc.filePath) {
       const ext = desc.fileExt ? `, ${this.escapeString(desc.fileExt)}` : '';
-      return `validateFsFile(ctx, ${this.escapeString(desc.filePath)}, p, i${ext})`;
+      return `${comment}validateFsFile(ctx, ${this.escapeString(desc.filePath)}, p, i${ext})`;
     }
 
     if (fsType === 'directory' && desc.filePath) {
-      return `validateFsDirectory(ctx, ${this.escapeString(desc.filePath)}, p, i)`;
+      return `${comment}validateFsDirectory(ctx, ${this.escapeString(desc.filePath)}, p, i)`;
     }
 
     return '/* unknown fs type */';

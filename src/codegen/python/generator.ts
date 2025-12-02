@@ -184,19 +184,20 @@ export class PythonGenerator extends CodeGenerator {
 
   generateFSChildExpr(desc: TypeDescription): string {
     const fsType = desc.fsType;
+    const comment = desc.description ? `  # ${desc.description}\n        ` : '';
 
     if (fsType === 'jsonFile' && desc.filePath) {
       const contentExpr = desc.children ? this.generateObjectExpr(desc.children) : 'None';
-      return `validate_json_file(ctx, ${this.escapeString(desc.filePath)}, p, i, content_validator=${contentExpr})`;
+      return `${comment}validate_json_file(ctx, ${this.escapeString(desc.filePath)}, p, i, content_validator=${contentExpr})`;
     }
 
     if (fsType === 'file' && desc.filePath) {
       const ext = desc.fileExt ? `, ext=${this.escapeString(desc.fileExt)}` : '';
-      return `validate_fs_file(ctx, ${this.escapeString(desc.filePath)}, p, i${ext})`;
+      return `${comment}validate_fs_file(ctx, ${this.escapeString(desc.filePath)}, p, i${ext})`;
     }
 
     if (fsType === 'directory' && desc.filePath) {
-      return `validate_fs_directory(ctx, ${this.escapeString(desc.filePath)}, p, i)`;
+      return `${comment}validate_fs_directory(ctx, ${this.escapeString(desc.filePath)}, p, i)`;
     }
 
     return 'None';

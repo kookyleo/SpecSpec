@@ -180,19 +180,20 @@ export class RustGenerator extends CodeGenerator {
 
   generateFSChildExpr(desc: TypeDescription): string {
     const fsType = desc.fsType;
+    const comment = desc.description ? `/* ${desc.description} */ ` : '';
 
     if (fsType === 'jsonFile' && desc.filePath) {
       const validatorArg = desc.children ? `Some(&(${this.generateObjectExpr(desc.children)}))` : 'None';
-      return `validate_json_file(ctx, ${this.escapeString(desc.filePath)}, p, i, ${validatorArg})`;
+      return `${comment}validate_json_file(ctx, ${this.escapeString(desc.filePath)}, p, i, ${validatorArg})`;
     }
 
     if (fsType === 'file' && desc.filePath) {
       const ext = desc.fileExt ? `Some(${this.escapeString(desc.fileExt)})` : 'None';
-      return `validate_fs_file(ctx, ${this.escapeString(desc.filePath)}, p, i, ${ext})`;
+      return `${comment}validate_fs_file(ctx, ${this.escapeString(desc.filePath)}, p, i, ${ext})`;
     }
 
     if (fsType === 'directory' && desc.filePath) {
-      return `validate_fs_directory(ctx, ${this.escapeString(desc.filePath)}, p, i)`;
+      return `${comment}validate_fs_directory(ctx, ${this.escapeString(desc.filePath)}, p, i)`;
     }
 
     return '/* unknown fs type */';

@@ -224,4 +224,57 @@ describe('Code generator validation logic', () => {
       expect(tsCode).toContain('maxItems: 10');
     });
   });
+
+  describe('FS item description comments', () => {
+    it('generates comments for JsonFile with description', () => {
+      const desc: TypeDescription = {
+        name: 'Bundle',
+        fsType: 'bundle',
+        accept: [{ name: 'Directory', fsType: 'directory' }],
+        children: {
+          required: [
+            {
+              name: 'JsonFile',
+              fsType: 'jsonFile',
+              filePath: 'config.json',
+              description: 'Main configuration file',
+            },
+          ],
+        },
+      };
+
+      const pyCode = generatePython(desc);
+      expect(pyCode).toContain('# Main configuration file');
+
+      const tsCode = generateTypeScript(desc);
+      expect(tsCode).toContain('/* Main configuration file */');
+
+      const swiftCode = generateSwift(desc);
+      expect(swiftCode).toContain('/* Main configuration file */');
+
+      const rustCode = generateRust(desc);
+      expect(rustCode).toContain('/* Main configuration file */');
+    });
+
+    it('does not add comment when description is absent', () => {
+      const desc: TypeDescription = {
+        name: 'Bundle',
+        fsType: 'bundle',
+        accept: [{ name: 'Directory', fsType: 'directory' }],
+        children: {
+          required: [
+            {
+              name: 'JsonFile',
+              fsType: 'jsonFile',
+              filePath: 'data.json',
+            },
+          ],
+        },
+      };
+
+      const pyCode = generatePython(desc);
+      expect(pyCode).not.toContain('# validate_json_file');
+      expect(pyCode).toContain('validate_json_file');
+    });
+  });
 });
